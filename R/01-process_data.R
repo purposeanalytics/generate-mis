@@ -15,7 +15,7 @@ process_data <- function(data_folder, debug){
   participants <- readr::read_rds(paste0(data_folder, "/interim/rds/participants.rds"))
   services <- readr::read_rds(paste0(data_folder, "/interim/rds/services.rds"))
   activities <- readr::read_rds(paste0(data_folder, "/interim/rds/activities.rds"))
-  functional_centres <- readr::read_rds(paste0(data_folder, "/interim/rds/functional_centres.rds"))
+  functional_centre_mapping <- readr::read_rds(paste0(data_folder, "/interim/rds/functional_centre_mapping.rds"))
 
   # Build service list ----
 
@@ -29,8 +29,10 @@ process_data <- function(data_folder, debug){
       dplyr::mutate(participant_preferred_language = NA_character_)
   }
 
+
+
   service_list <- all_functional_centres_and_statistical_codes |>
-    dplyr::right_join(functional_centres, by = c("funder_service_code")) |>
+    dplyr::right_join(functional_centre_mapping, by = c("funder_service_code")) |>
     dplyr::mutate(funder_service_name = stringr::str_replace_all(funder_service_name, clean_fc_names)) |>
     dplyr::mutate(funder_target_category = NA,
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "248"), "Meals Delivered-Combined", funder_target_category ),
@@ -101,7 +103,7 @@ process_data <- function(data_folder, debug){
 
   mis_visits <- activities |>
     dplyr::filter(stringr::str_detect(service_id, "--80") | stringr::str_sub(funder_service_code, 2, 2) == "2") |>
-    dplyr::filter(activity_status == "Completed") |>
+    dplyr::filter(activity_status == "Completed" & participant_id != "unregistered") |>
     dplyr::filter(activity_type %in% c("Face-to-face", "Face-to-face Virtual", "Non-face-to-face") | activity_individual_group == "Group" | funder_service_code == "72 5 82 10") |>
 
     # include all activity_durations for Transportation
@@ -122,6 +124,12 @@ process_data <- function(data_folder, debug){
       dplyr::mutate(activity_assessment = NA_character_)
   }
 
+
+  rlog::log_info("Building MIS unregistered interactions table")
+
+  mis_unregistered_interactions <- activities |>
+    dplyr::filter(stringr::str_detect(service_id, "--80") | stringr::str_sub(funder_service_code, 2, 2) == "2") |>
+    dplyr::filter(activity_status == "Completed" & participant_id != "unregistered")
 
 
   rlog::log_info("Building MIS daily census table")
@@ -152,6 +160,7 @@ process_data <- function(data_folder, debug){
   processed_data <- list(data_folder = data_folder,
                          mis_service_history = mis_service_history,
                          mis_visits = mis_visits,
+                         mis_unregistered_interactions = mis_unregistered_interactions,
                          mis_daily_census = mis_daily_census,
                          service_list = service_list)
 

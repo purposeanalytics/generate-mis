@@ -12,6 +12,7 @@ generate_visit_and_service_counts <- function(processed_data,
   data_folder <- processed_data$data_folder
   mis_service_history <- processed_data$mis_service_history
   mis_visits <- processed_data$mis_visits
+  mis_unregistered_interactions <- processed_data$mis_unregistered_interactions
   mis_daily_census <- processed_data$mis_daily_census
 
   # S248 ** ** Meals Delivered (Number of)
@@ -103,6 +104,7 @@ generate_visit_and_service_counts <- function(processed_data,
   rlog::log_info("Generating S266 statistic")
 
   calc_266 <- mis_visits |>
+    dplyr::bind_rows(mis_unregistered_interactions) |>
     filter_eligible("266") |>
     dplyr::filter(activity_individual_group =="Group") |>
     dplyr::mutate(digits_1_3 = "266",
@@ -369,8 +371,8 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(!is.na(participant_id)) |>
     # non-residential CSS
     dplyr::filter(get_sr_code(funder_service_code) == "80") |>
-    # interactions must be > 5 min to count; include entries with no reported time interval
-    dplyr::filter(activity_duration > 5 | activity_duration == 0 | is.na(activity_duration)) |>
+    # interactions must be > 5 min to count; include entries with no reported time interval and all transportation visits
+    dplyr::filter(activity_duration > 5 | activity_duration == 0 | is.na(activity_duration) | funder_service_code == "72 5 82 14") |>
     # individual interactions only
     dplyr::filter(activity_individual_group == "Individual") |>
     # remove indirect and clinical entries
@@ -391,6 +393,29 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
 
   calc_service_450_451_css <- calc_450_451_css |>
+    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
+    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+
+
+  # S452 65 00 Not Uniquely Identified Service Recipient Interactions ----
+  # The number of interactions face to face, or non - face to face with a service recipient/client or significant other who is not uniquely identified. This statistic is used when a health record or unique identifier has not been generated and/or there is no documentation according to the health care organization’s policy.  Only service recipient codes 60 and 65 can be used with this account.  Examples of functional centres where this account can be used are Education (7* 8), Health Promotion and Education (7* 5 50) and Information & Referral (7* 5 70).
+
+  rlog::log_info("Generating S452 statistic")
+
+  calc_452 <- mis_unregistered_interactions |>
+    filter_eligible("452") |>
+    dplyr::filter(activity_individual_group == "Individual") |>
+    dplyr::mutate(digits_1_3 = "452",
+                  digits_4_5 = "65",
+                  digits_6_7 = "00") |>
+    assemble_statistical_account() |>
+    dplyr::rename(date = activity_date)
+
+  calc_fc_452 <- calc_452 |>
+    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
+    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+
+  calc_service_452 <- calc_452 |>
     dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
     dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
 
@@ -523,6 +548,26 @@ generate_visit_and_service_counts <- function(processed_data,
   #Note: Not Uniquely Identified Service Recipients participating in group sessions are not reported in S455 ** **, Individuals served by FC, nor in S855 ** 76, Individuals served by Organization.
 
 
+  rlog::log_info("Generating S491 65 10 statistic")
+
+  calc_491_65_10 <- mis_unregistered_interactions |>
+    filter_eligible("491") |>
+    dplyr::filter(activity_individual_group == "Group") |>
+    dplyr::mutate(digits_1_3 = "491",
+                  digits_4_5 = "65",
+                  digits_6_7 = "10") |>
+    assemble_statistical_account() |>
+    dplyr::rename(date = activity_date)
+
+  calc_fc_491_65_10 <- calc_491_65_10 |>
+    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
+    dplyr::summarize(value = sum(activity_count))
+
+  calc_service_491_65_10 <- calc_491_65_10 |>
+    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
+    dplyr::summarize(value = sum(activity_count))
+
+
   # S491 ** 20 Group Participants, Uniquely Identified Service Recipient Attendance ----
   #This is reported when a uniquely identified service recipient receives services in a group session.
   #The service is documented according to the health care organization’s policy.
@@ -544,13 +589,6 @@ generate_visit_and_service_counts <- function(processed_data,
 
   calc_service_491 <- calc_491 |>
     dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
-
-  # NUI: dplyr::mutate(funder_statistical_account_code = dplyr::case_when(
-  #   is.na(participant_id) & get_sr_code(funder_service_code) != "80" ~ "491 65 10",
-  #   is.na(participant_id) & get_sr_code(funder_service_code) == "80" ~ "491 60 10",
-  #   # support for other nonregistered ID codes?
-  #   .default = paste("491",  get_sr_code(funder_service_code), "20"))
-  # ) |>
 
 
   # S492 00 *0 Group Sessions in Person (Number of Group Sessions) ----
@@ -576,6 +614,7 @@ generate_visit_and_service_counts <- function(processed_data,
   rlog::log_info("Generating S492 statistic")
 
   calc_492 <- mis_visits |>
+    dplyr::bind_rows(mis_unregistered_interactions) |>
     filter_eligible("492") |>
     dplyr::filter(activity_individual_group == "Group") |>
     dplyr::mutate(funder_statistical_account_code =
@@ -806,13 +845,13 @@ generate_visit_and_service_counts <- function(processed_data,
 
   rlog::log_info("Writing cumulative-type statistics files")
 
-  mis_visit_and_service_counts_by_fc <- dplyr::bind_rows(calc_fc_248, calc_fc_265, calc_fc_266, calc_fc_401, calc_fc_407, calc_fc_407_99, calc_fc_410_513_cmha, calc_fc_410_513_css, calc_fc_450_451_cmha, calc_fc_450_451_css, calc_fc_454, calc_fc_483_484, calc_fc_489, calc_fc_491, calc_fc_492, calc_org_501, calc_fc_506, calc_fc_511_cmha, calc_fc_511_css, calc_fc_512) |>
+  mis_visit_and_service_counts_by_fc <- dplyr::bind_rows(calc_fc_248, calc_fc_265, calc_fc_266, calc_fc_401, calc_fc_407, calc_fc_407_99, calc_fc_410_513_cmha, calc_fc_410_513_css, calc_fc_450_451_cmha, calc_fc_450_451_css, calc_fc_452, calc_fc_454, calc_fc_483_484, calc_fc_489, calc_fc_491_65_10, calc_fc_491, calc_fc_492, calc_org_501, calc_fc_506, calc_fc_511_cmha, calc_fc_511_css, calc_fc_512) |>
     dplyr::mutate(funder_key = paste0(funder_service_code, "_", funder_statistical_account_code))
 
   readr::write_csv(mis_visit_and_service_counts_by_fc, paste0(data_folder, "/processed/mis_visit_and_service_counts_by_fc.csv"), na = "")
 
 
-  mis_visit_and_service_counts_by_service <- dplyr::bind_rows(calc_service_248, calc_service_265, calc_service_266, calc_service_401,  calc_service_407, calc_service_407_99, calc_service_410_513_cmha, calc_service_410_513_css, calc_service_450_451_cmha, calc_service_450_451_css, calc_service_454, calc_service_483_484, calc_service_489, calc_service_491, calc_service_492, calc_service_506, calc_service_512) |>
+  mis_visit_and_service_counts_by_service <- dplyr::bind_rows(calc_service_248, calc_service_265, calc_service_266, calc_service_401,  calc_service_407, calc_service_407_99, calc_service_410_513_cmha, calc_service_410_513_css, calc_service_450_451_cmha, calc_service_450_451_css, calc_service_452, calc_service_454, calc_service_483_484, calc_service_489, calc_service_491_65_10, calc_service_491, calc_service_492, calc_service_506, calc_service_512) |>
     dplyr::mutate(funder_service_key = paste0(funder_service_code, "_", service_name, "_", funder_statistical_account_code))
 
   readr::write_csv(mis_visit_and_service_counts_by_service, paste0(data_folder, "/processed/mis_visit_and_service_counts_by_service.csv"), na = "")
