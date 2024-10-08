@@ -1,0 +1,18 @@
+
+clean_fc_names <- c("Case Management /Supportive Counselling & Services " = "Case Management ",
+                    "Case Management  /Supportive Counselling & Services " = "Case Management ",
+                    "Case Management/Supportive Counselling & Services " = "Case Management ",
+                    "MH Services" = "Mental Health",
+                    "COM Clinic/Program – " = "",
+                    "COM IH Health Care - " = "",
+                    "COM Res. – Mental Health – " = "",
+                    "COM Res. – Addictions – " = "Res. ",
+                    "CSS IH & CS - Case Management" = "Case Management – CSS",
+                    "CSS IH & CS - " = "",
+                    "CCS IH & CS - " = "",
+                    "COM " = "",
+                    "CSS " = "",
+                    "Health Prom. Educ " = "Health Promotion/Education ",
+                    "Health Prom/Educ. " = "Health Promotion/Education ",
+                    "-" = " – ",
+                    "–" = " – ")
