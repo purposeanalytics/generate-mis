@@ -122,11 +122,14 @@ generate_census_counts <- function(processed_data,
   rlog::log_info("Generating S455 statistic")
 
   if(fc_455_version == "verA"){
-    ## Service enrollment-based calculation
+    ## Service enrollment with at least one visit calculation
     calc_fc_455 <- mis_daily_census |>
       filter_eligible("455") |>
       dplyr::filter(service_status == "Active") |>
       dplyr::distinct(date, participant_id, funder_service_code, participant_age_group_code) |>
+
+      # join against visits in period (i.e. must be enrolled and have at least one visit)
+      dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id", "funder_service_code")) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
       dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
@@ -145,6 +148,9 @@ generate_census_counts <- function(processed_data,
       filter_eligible("455") |>
       dplyr::filter(service_status == "Active") |>
       dplyr::distinct(date, participant_id, funder_service_code, service_name, participant_age_group_code) |>
+
+      # join against visits in period (i.e. must be enrolled and have at least one visit)
+      dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id", "funder_service_code", "service_name")) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
       dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
@@ -199,7 +205,44 @@ generate_census_counts <- function(processed_data,
       dplyr::select(date, funder_service_code, service_name, funder_statistical_account_code, participant_id)
   }
 
+  if(fc_455_version == "verC"){
+    ## Service enrollment-based calculation with
+    calc_fc_455 <- mis_daily_census |>
+      filter_eligible("455") |>
+      dplyr::filter(service_status == "Active") |>
+      dplyr::distinct(date, participant_id, funder_service_code, participant_age_group_code) |>
 
+      # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::group_by(participant_id, funder_service_code, fiscal_year) |>
+      dplyr::mutate(participant_age_group_code = min(participant_age_group_code)) |>
+      dplyr::ungroup() |>
+
+      # assemble funder_statistical_account_code
+      dplyr::mutate(digits_1_3 = "455",
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = participant_age_group_code) |>
+      assemble_statistical_account() |>
+      dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
+
+    calc_service_455 <- mis_daily_census |>
+      filter_eligible("455") |>
+      dplyr::filter(service_status == "Active") |>
+      dplyr::distinct(date, participant_id, funder_service_code, service_name, participant_age_group_code) |>
+
+      # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::group_by(participant_id, funder_service_code, service_name, fiscal_year) |>
+      dplyr::mutate(participant_age_group_code = min(participant_age_group_code)) |>
+      dplyr::ungroup() |>
+
+      # assemble funder_statistical_account_code
+      dplyr::mutate(digits_1_3 = "455",
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = participant_age_group_code) |>
+      assemble_statistical_account() |>
+      dplyr::select(date, funder_service_code, funder_statistical_account_code, service_name, participant_id)
+  }
   # S855 ** 5* Individuals Served by Organization ----
   # This statistical account is a year-to-date count of the number of individuals served by the organization, within a provincial sector code, and by fund type in a reporting period and identified by a unique identifier.  Individuals are counted only once within the organization within a fiscal year, regardless of how many different services they have received or the number of times they were admitted and discharged within the reporting period.  Age category reporting is required.  This account is reported in accounting centre 8*990.
   # - S 855 ** 52 Individuals Served by Org. – Elderly
@@ -213,11 +256,14 @@ generate_census_counts <- function(processed_data,
 
 
   if(fc_455_version == "verA"){
-    ## Service enrollment-based calculation
+    ## Service enrollment with at least one visit calculation
     calc_org_855 <- mis_daily_census |>
       filter_eligible("855") |>
       dplyr::filter(service_status == "Active") |>
       dplyr::distinct(date, participant_id,  participant_age_group_code) |>
+
+      # join against visits in period (i.e. must be enrolled and have at least one visit)
+      dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id")) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
       dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
@@ -260,6 +306,30 @@ generate_census_counts <- function(processed_data,
       dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
   }
 
+  if(fc_455_version == "verC"){
+    ## Service enrollment-based calculation
+    calc_org_855 <- mis_daily_census |>
+      filter_eligible("855") |>
+      dplyr::filter(service_status == "Active") |>
+      dplyr::distinct(date, participant_id,  participant_age_group_code) |>
+
+      # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::group_by(participant_id, fiscal_year) |>
+      dplyr::mutate(participant_age_group_code = min(participant_age_group_code)) |>
+      dplyr::ungroup() |>
+
+      # add organizational functional centre
+      dplyr::mutate(funder_service_code = "82 9 90") |>
+
+      # assemble funder_statistical_account_code
+      dplyr::mutate(digits_1_3 = "855",
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = participant_age_group_code) |>
+      assemble_statistical_account() |>
+      dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
+  }
+
 
   # S950 ** 10 Francophone Individuals Requested Service/Served in French (4th, 5th = SR code) ----
   # The following S950* accounts are available for reporting services provided to Francophone clients.  For CSS HSPs, it is mandatory to report S9508010 and S9501080 for individuals requested service in French by functional centre and organization level respectively.  S9508020 and S9502080 for individuals served in French are optional reporting.
@@ -272,11 +342,14 @@ generate_census_counts <- function(processed_data,
   rlog::log_info("Generating S950 statistic")
 
   if(fc_455_version == "verA"){
-    ## Service enrollment-based calculation
+    ## Service enrollment with at least one visit calculation
     calc_org_950_10 <- mis_daily_census |>
       filter_eligible("950") |>
       dplyr::filter(service_status == "Active" & participant_preferred_language == "French") |>
       dplyr::distinct(date, participant_id) |>
+
+      # join against visits in period (i.e. must be enrolled and have at least one visit)
+      dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id")) |>
 
       # add organizational functional centre
       dplyr::mutate(funder_service_code = "82 9 90") |>
@@ -293,6 +366,9 @@ generate_census_counts <- function(processed_data,
       dplyr::filter(service_status == "Active" & participant_preferred_language == "French") |>
       dplyr::distinct(date, participant_id, funder_service_code) |>
 
+      # join against visits in period (i.e. must be enrolled and have at least one visit)
+      dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id", "funder_service_code")) |>
+
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "950",
                     digits_4_5 = "80",
@@ -304,6 +380,9 @@ generate_census_counts <- function(processed_data,
       filter_eligible("950") |>
       dplyr::filter(service_status == "Active" & participant_preferred_language == "French") |>
       dplyr::distinct(date, participant_id, funder_service_code, service_name) |>
+
+      # join against visits in period (i.e. must be enrolled and have at least one visit)
+      dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id", "funder_service_code", "service_name")) |>
 
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "950",
@@ -355,6 +434,48 @@ generate_census_counts <- function(processed_data,
       dplyr::distinct(date, funder_service_code, service_name, funder_statistical_account_code, participant_id)
   }
 
+  if(fc_455_version == "verC"){
+    ## Service enrollment-based calculation
+    calc_org_950_10 <- mis_daily_census |>
+      filter_eligible("950") |>
+      dplyr::filter(service_status == "Active" & participant_preferred_language == "French") |>
+      dplyr::distinct(date, participant_id) |>
+
+      # add organizational functional centre
+      dplyr::mutate(funder_service_code = "82 9 90") |>
+
+      # assemble funder_statistical_account_code
+      dplyr::mutate(digits_1_3 = "950",
+                    digits_4_5 = "10",
+                    digits_6_7 = "80") |>
+      assemble_statistical_account() |>
+      dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
+
+    calc_fc_950 <- mis_daily_census |>
+      filter_eligible("950") |>
+      dplyr::filter(service_status == "Active" & participant_preferred_language == "French") |>
+      dplyr::distinct(date, participant_id, funder_service_code) |>
+
+      # assemble funder_statistical_account_code
+      dplyr::mutate(digits_1_3 = "950",
+                    digits_4_5 = "80",
+                    digits_6_7 = "10") |>
+      assemble_statistical_account() |>
+      dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
+
+    calc_service_950 <- mis_daily_census |>
+      filter_eligible("950") |>
+      dplyr::filter(service_status == "Active" & participant_preferred_language == "French") |>
+      dplyr::distinct(date, participant_id, funder_service_code, service_name) |>
+
+      # assemble funder_statistical_account_code
+      dplyr::mutate(digits_1_3 = "950",
+                    digits_4_5 = "80",
+                    digits_6_7 = "10") |>
+      assemble_statistical_account() |>
+      dplyr::select(date, funder_service_code, service_name, funder_statistical_account_code, participant_id)
+  }
+
   # S955 80 ** Individuals Served ----
   # The following S955* statistics provide a breakdown of the number of CSS clients served as reported in S455 80 ** specific FCs.
   # •	S955 80 10	Individuals Served – Physical Disability
@@ -375,11 +496,14 @@ generate_census_counts <- function(processed_data,
   rlog::log_info("Generating S955 statistic")
 
   if(fc_455_version == "verA"){
-    ## Service enrollment-based calculation
+    ## Service enrollment with at least one visit calculation
     calc_org_955 <- mis_daily_census |>
       filter_eligible("955") |>
       dplyr::filter(service_status == "Active") |>
       dplyr::distinct(date, participant_id, participant_ohrs_special_needs) |>
+
+      # join against visits in period (i.e. must be enrolled and have at least one visit)
+      dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id")) |>
 
       # add organizational functional centre
       dplyr::mutate(funder_service_code = "82 9 90") |>
@@ -399,6 +523,9 @@ generate_census_counts <- function(processed_data,
       filter_eligible("955") |>
       dplyr::filter(service_status == "Active") |>
       dplyr::distinct(date, participant_id, funder_service_code, service_name, participant_ohrs_special_needs) |>
+
+      # join against visits in period (i.e. must be enrolled and have at least one visit)
+      dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id", "funder_service_code", "service_name")) |>
 
       # add organizational functional centre
       dplyr::mutate(funder_service_code = "82 9 90") |>
@@ -449,6 +576,47 @@ generate_census_counts <- function(processed_data,
                                      participant_ohrs_special_needs == "Living With Effects Of HIV-AIDS" ~ "25")) |>
       assemble_statistical_account() |>
       dplyr::rename(date = activity_date) |>
+      dplyr::select(date, funder_service_code, service_name, funder_statistical_account_code, participant_id)
+  }
+
+  if(fc_455_version == "verC"){
+    ## Service enrollment-based calculation
+    calc_org_955 <- mis_daily_census |>
+      filter_eligible("955") |>
+      dplyr::filter(service_status == "Active") |>
+      dplyr::distinct(date, participant_id, participant_ohrs_special_needs) |>
+
+      # add organizational functional centre
+      dplyr::mutate(funder_service_code = "82 9 90") |>
+
+      # assemble funder_statistical_account_code
+      dplyr::mutate(digits_1_3 = "955",
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = dplyr::case_when(participant_ohrs_special_needs == "Physical Disability" ~ "10",
+                                                  participant_ohrs_special_needs == "Cognitive Impairment" ~ "15",
+                                                  participant_ohrs_special_needs == "Frail And-or Elderly" ~ "20",
+                                                  participant_ohrs_special_needs == "High Risk Senior" ~ "22",
+                                                  participant_ohrs_special_needs == "Living With Effects Of HIV-AIDS" ~ "25")) |>
+      assemble_statistical_account() |>
+      dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
+
+    calc_service_955 <- mis_daily_census |>
+      filter_eligible("955") |>
+      dplyr::filter(service_status == "Active") |>
+      dplyr::distinct(date, participant_id, funder_service_code, service_name, participant_ohrs_special_needs) |>
+
+      # add organizational functional centre
+      dplyr::mutate(funder_service_code = "82 9 90") |>
+
+      # assemble funder_statistical_account_code
+      dplyr::mutate(digits_1_3 = "955",
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = dplyr::case_when(participant_ohrs_special_needs == "Physical Disability" ~ "10",
+                                                  participant_ohrs_special_needs == "Cognitive Impairment" ~ "15",
+                                                  participant_ohrs_special_needs == "Frail And-or Elderly" ~ "20",
+                                                  participant_ohrs_special_needs == "High Risk Senior" ~ "22",
+                                                  participant_ohrs_special_needs == "Living With Effects Of HIV-AIDS" ~ "25")) |>
+      assemble_statistical_account() |>
       dplyr::select(date, funder_service_code, service_name, funder_statistical_account_code, participant_id)
   }
 

@@ -49,6 +49,11 @@ process_data <- function(data_folder, debug){
            funder_target_key = dplyr::if_else(!is.na(funder_target_category), glue::glue("{funder_service_code}_{funder_target_category}"), NA_character_)) |>
     dplyr::filter(!is.na(funder_service_name))
 
+  if(!("service_department" %in% colnames(service_list))){
+    service_list <- service_list |>
+      dplyr::mutate(service_department = NA_character_)
+  }
+
   readr::write_csv(service_list, paste0(data_folder, "/processed/service_list.csv"), na = "")
 
 
