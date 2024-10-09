@@ -4,7 +4,7 @@
 <!-- badges: start -->
 <!-- badges: end -->
 
-The generateMIS package will transform program data saved in Purpose Analytics' standard format into statistics required by the Ministry of Health and Long-Term Care for quarterly reporting (Chapters 7 and 10).
+The generateMIS package transforms program data saved in Purpose Analytics' standard format into statistics required by the Ministry of Health and Long-Term Care for quarterly reporting (Chapters 7 and 10).
 
 The statistics are saved in a "pre-aggregated" format so that they can be consumed by Purpose Analytics' Power BI MIS Report. The Power BI MIS Report supports dynamic aggregation so that MIS statistics and targets for the year can be calculated on the fly for any point in time.
 
