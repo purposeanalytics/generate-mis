@@ -40,7 +40,7 @@ The location on your local drive of the `data` folder containing the following s
 
 **fc_455_version**
 
-This can take one of three options for counting individuals under the "Individuals Served" statistics (455 \*\* \*\*, 855 \*\* \*\*, 950 \*\* \*\*, 955 \*\* \*\*):
+This can take one of three conditions for counting individuals under the "Individuals Served" statistics (455 \*\* \*\*, 855 \*\* \*\*, 950 \*\* \*\*, 955 \*\* \*\*):
 
 * `verA` which requires that an individual has been enrolled or admitted to a program or service *and* has received at least one visit 
 * `verB` which requires that an individual has received at least one visit *regardless* of their enrollment or admission status 
@@ -48,7 +48,7 @@ This can take one of three options for counting individuals under the "Individua
 
 **fc_506_version**
 
-This can take on of two options for counting when the first service was received (506 ** **):
+This can take on of two conditions for counting when the first service was received (506 \*\* \*\*):
 
 * `verA` which counts the date of enrollment or admission as the first service date
 * `verB` which counts the first visit after the enrollment or admission date

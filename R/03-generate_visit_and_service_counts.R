@@ -7,6 +7,7 @@
 #'
 #' @examples
 generate_visit_and_service_counts <- function(processed_data,
+                                              fc_450_version = "verA",
                                               fc_506_version = "verA"){
 
   data_folder <- processed_data$data_folder
@@ -323,12 +324,26 @@ generate_visit_and_service_counts <- function(processed_data,
 
   rlog::log_info("Generating S450 & S451 statistic")
 
-  calc_450_451_cmha <- mis_visits |>
+
+  if(fc_450_version == "verA"){
+
+    # interactions must be > 5 min to count; include entries with no reported time interval and all CSS Transportation
+    calc_450_451 <- mis_visits |>
+      dplyr::filter(activity_duration > 5 | activity_duration == 0 | is.na(activity_duration) | funder_service_code == "72 5 82 14")
+
+  }
+
+  if(fc_450_version == "verB"){
+
+    # all interactions regardless of duration (can be required for bulk notes where time is divided across clients)
+    calc_450_451 <- mis_visits
+
+  }
+
+  calc_450_451_cmha <- calc_450_451 |>
     filter_eligible("450|451") |>
     # non-residential CMHA
     dplyr::filter(get_sr_code(funder_service_code) == "25") |>
-    # interactions must be > 5 min to count; include entries with no reported time interval
-    dplyr::filter(activity_duration > 5 | activity_duration == 0 | is.na(activity_duration)) |>
     # individual interactions only
     dplyr::filter(activity_individual_group == "Individual") |>
     # remove indirect and clinical entries
@@ -365,14 +380,12 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
 
 
-  calc_450_451_css <- mis_visits |>
+  calc_450_451_css <- calc_450_451 |>
     filter_eligible("450|451") |>
     # clients must be uniquely identified
     dplyr::filter(!is.na(participant_id)) |>
     # non-residential CSS
     dplyr::filter(get_sr_code(funder_service_code) == "80") |>
-    # interactions must be > 5 min to count; include entries with no reported time interval and all transportation visits
-    dplyr::filter(activity_duration > 5 | activity_duration == 0 | is.na(activity_duration) | funder_service_code == "72 5 82 14") |>
     # individual interactions only
     dplyr::filter(activity_individual_group == "Individual") |>
     # remove indirect and clinical entries

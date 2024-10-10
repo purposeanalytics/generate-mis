@@ -7,10 +7,11 @@
 #' @export
 #'
 #' @examples
-generate_tables <- function(data_folder,
-                            debug = FALSE,
+generate_tables <- function(data_folder = here::here("data"),
+                            fc_450_version = "verA",
                             fc_455_version = "verA",
-                            fc_506_version = "verA") {
+                            fc_506_version = "verA",
+                            debug = FALSE) {
 
   if(debug == TRUE) {
     rlog::log_warn("Running in debug mode")
