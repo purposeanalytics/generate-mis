@@ -71,14 +71,34 @@ generate_visit_and_service_counts <- function(processed_data,
 
   rlog::log_info("Generating S265 statistic")
 
-  calc_265 <- mis_visits |>
-    filter_eligible("265") |>
-    dplyr::filter(activity_individual_group =="Individual") |>
-    dplyr::mutate(digits_1_3 = "265",
-                  digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = get_time_intervals(activity_duration)) |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = activity_date)
+  if(fc_450_version == "verA"){
+
+    # interactions <= 5 min will not be counted
+    calc_265 <- mis_visits |>
+      filter_eligible("265") |>
+      dplyr::filter(activity_individual_group =="Individual") |>
+      dplyr::mutate(digits_1_3 = "265",
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = get_time_intervals(activity_duration)) |>
+      assemble_statistical_account() |>
+      dplyr::rename(date = activity_date)
+
+  }
+
+  if(fc_450_version == "verB"){
+
+    # set interactions under 5 min to 0 min so that they are counted as "time not reported"
+    calc_265 <- mis_visits |>
+      filter_eligible("265") |>
+      dplyr::filter(activity_individual_group =="Individual") |>
+      dplyr::mutate(activity_duration == dplyr::if_else(activity_duration <= 5), 0, activity_duration) |>
+      dplyr::mutate(digits_1_3 = "265",
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = get_time_intervals(activity_duration)) |>
+      assemble_statistical_account() |>
+      dplyr::rename(date = activity_date)
+
+  }
 
   calc_fc_265 <- calc_265 |>
     dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
