@@ -42,6 +42,7 @@ process_data <- function(data_folder, debug){
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "403"), "Inpatient/Resident Days", funder_target_category ),
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "(450|451)"), "Visits", funder_target_category ),
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "452"), "Not Uniquely Identified Service Recipient Interactions", funder_target_category ),
+           funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "453"), "Hours of Care", funder_target_category ),
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "455"), "Individuals Served by Functional Centre", funder_target_category ),
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "492 00"), "Group Sessions", funder_target_category ),
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "483"), "Attendance Days", funder_target_category ),

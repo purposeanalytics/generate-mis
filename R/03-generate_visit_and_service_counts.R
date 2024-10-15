@@ -35,7 +35,9 @@ generate_visit_and_service_counts <- function(processed_data,
                   digits_6_7 = dplyr::case_when(stringr::str_detect(activity_type, "Hot") ~ "12",
                                   stringr::str_detect(activity_type, "Cold") ~ "12",
                                   stringr::str_detect(activity_type, "Frozen") ~ "14",
-                                  stringr::str_detect(activity_type, "Soup") ~ "16")) |>
+                                  stringr::str_detect(activity_type, "Soup") |
+                                    stringr::str_detect(activity_type, "Dessert") |
+                                    stringr::str_detect(activity_type, "Side") ~ "16")) |>
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
 
