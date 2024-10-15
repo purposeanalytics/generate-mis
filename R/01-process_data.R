@@ -17,8 +17,6 @@ process_data <- function(data_folder, debug){
   activities <- readr::read_rds(paste0(data_folder, "/interim/rds/activities.rds"))
   functional_centre_mapping <- readr::read_rds(paste0(data_folder, "/interim/rds/functional_centre_mapping.rds"))
 
-  # Build service list ----
-
   if(!("participant_ohrs_special_needs" %in% colnames(participants))){
     participants <- participants |>
       dplyr::mutate(participant_ohrs_special_needs = NA_character_)
@@ -30,6 +28,7 @@ process_data <- function(data_folder, debug){
   }
 
 
+  # Build service list ----
 
   service_list <- all_functional_centres_and_statistical_codes |>
     dplyr::right_join(functional_centre_mapping, by = c("funder_service_code")) |>
