@@ -110,7 +110,7 @@ process_data <- function(data_folder, debug){
   mis_visits <- activities |>
     dplyr::filter(stringr::str_detect(service_id, "--80") | stringr::str_sub(funder_service_code, 2, 2) == "2") |>
     dplyr::filter(activity_status == "Completed" & participant_id != "Unregistered") |>
-    dplyr::filter(activity_type %in% c("Face-to-face", "Face-to-face Virtual", "Non-face-to-face") | activity_individual_group == "Group" | funder_service_code == "72 5 82 10") |>
+    dplyr::filter(activity_type %in% c("Face-to-face", "Face-to-face Virtual", "Non-face-to-face", "Assessment") | activity_individual_group == "Group" | funder_service_code == "72 5 82 10") |>
 
     # include all activity_durations for Transportation
     dplyr::mutate(activity_duration = dplyr::if_else(funder_service_code == "725 82 14", dplyr::if_else(activity_duration < 5, 6, activity_duration), activity_duration))

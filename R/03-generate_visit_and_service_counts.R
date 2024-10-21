@@ -78,7 +78,10 @@ generate_visit_and_service_counts <- function(processed_data,
     # interactions <= 5 min will not be counted
     calc_265 <- mis_visits |>
       filter_eligible("265") |>
-      dplyr::filter(activity_individual_group =="Individual") |>
+      # individual interactions only
+      dplyr::filter(activity_individual_group == "Individual") |>
+      # remove indirect and clinical entries
+      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
       dplyr::mutate(digits_1_3 = "265",
                     digits_4_5 = get_sr_code(funder_service_code),
                     digits_6_7 = get_time_intervals(activity_duration)) |>
@@ -92,7 +95,10 @@ generate_visit_and_service_counts <- function(processed_data,
     # set interactions under 5 min to 0 min so that they are counted as "time not reported"
     calc_265 <- mis_visits |>
       filter_eligible("265") |>
-      dplyr::filter(activity_individual_group =="Individual") |>
+      # individual interactions only
+      dplyr::filter(activity_individual_group == "Individual") |>
+      # remove indirect and clinical entries
+      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
       dplyr::mutate(activity_duration == dplyr::if_else(activity_duration <= 5, 0, activity_duration)) |>
       dplyr::mutate(digits_1_3 = "265",
                     digits_4_5 = get_sr_code(funder_service_code),
