@@ -11,8 +11,8 @@
 calculate_age <- function(df, date_of_birth, reference_date){
   df |>
     dplyr::mutate(participant_age = lubridate::interval({{date_of_birth}}, {{reference_date}}) / lubridate::years(1),
-           participant_age_group_code = cut(participant_age, breaks = c(0, 17, 65, 999), labels = c("60", "40", "20")),
-           participant_age_group_code = dplyr::coalesce(participant_age_group_code, "90"),
+           participant_funder_age_group_code = cut(participant_age, breaks = c(0, 17, 65, 999), labels = c("60", "40", "20")),
+           participant_funder_age_group_code = dplyr::coalesce(participant_funder_age_group_code, "90"),
            participant_age = floor(participant_age),
            .after = participant_date_of_birth) |>
     dplyr::select(-participant_date_of_birth)
@@ -130,7 +130,7 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
     dplyr::group_by(participant_id, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::mutate(index = c(0, cumsum(as.numeric(dplyr::lead({{dimension_start}})) >
                                  cummax(as.numeric(end_date)))[-dplyr::n()])) |>
-    dplyr::group_by(participant_id, participant_age_group_code, index, dplyr::pick(dplyr::all_of(grouping_variables))) |>
+    dplyr::group_by(participant_id, participant_funder_age_group_code, index, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::summarize(merged_start_date = dplyr::first({{dimension_start}}),
               merged_end_date = dplyr::last(end_date),
               all_starts = paste({{dimension_start}}, collapse = ", "),
@@ -177,7 +177,7 @@ intersect_overlaps <- function(df, dimension_start, dimension_end, report_end, m
     dplyr::group_by(participant_id, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::mutate(index = c(0, cumsum(as.numeric(dplyr::lead({{dimension_start}})) >
                                  cummax(as.numeric(end_date)))[-dplyr::n()])) |>
-    dplyr::group_by(participant_id, participant_age_group_code, index, dplyr::pick(dplyr::all_of(grouping_variables))) |>
+    dplyr::group_by(participant_id, participant_funder_age_group_code, index, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::summarize(merged_start_date = dplyr::last({{dimension_start}}),
               merged_end_date = dplyr::first(end_date),
               all_starts = paste({{dimension_start}}, collapse = ", "),

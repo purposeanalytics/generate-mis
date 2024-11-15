@@ -166,7 +166,7 @@ generate_visit_and_service_counts <- function(processed_data,
     merge_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
     dplyr::mutate(digits_1_3 = "401",
                   digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = participant_age_group_code) |>
+                  digits_6_7 = participant_funder_age_group_code) |>
     assemble_statistical_account() |>
     dplyr::rename(date = merged_start_date)  |>
     dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
@@ -175,7 +175,7 @@ generate_visit_and_service_counts <- function(processed_data,
     merge_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
     dplyr::mutate(digits_1_3 = "401",
                   digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = participant_age_group_code) |>
+                  digits_6_7 = participant_funder_age_group_code) |>
     assemble_statistical_account() |>
     dplyr::rename(date = merged_start_date)  |>
     dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
@@ -283,7 +283,7 @@ generate_visit_and_service_counts <- function(processed_data,
            service_status_reason_code = dplyr::if_else(stringr::str_detect(service_status_reason_code, "\\d\\d"), service_status_reason_code, "90")) |>
     dplyr::mutate(digits_1_3 = dplyr::if_else(funder_service_code == "72 5 82 45", "410", "513"),
                   digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = dplyr::if_else(funder_service_code == "72 5 82 45", participant_age_group_code, service_status_reason_code)) |>
+                  digits_6_7 = dplyr::if_else(funder_service_code == "72 5 82 45", participant_funder_age_group_code, service_status_reason_code)) |>
     assemble_statistical_account() |>
     dplyr::rename(date = merged_end_date) |>
     dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
@@ -297,7 +297,7 @@ generate_visit_and_service_counts <- function(processed_data,
            service_status_reason_code = dplyr::if_else(stringr::str_detect(service_status_reason_code, "\\d\\d"), service_status_reason_code, "90")) |>
     dplyr::mutate(digits_1_3 = dplyr::if_else(funder_service_code == "72 5 82 45", "410", "513"),
                   digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = dplyr::if_else(funder_service_code == "72 5 82 45", participant_age_group_code, service_status_reason_code)) |>
+                  digits_6_7 = dplyr::if_else(funder_service_code == "72 5 82 45", participant_funder_age_group_code, service_status_reason_code)) |>
     assemble_statistical_account() |>
     dplyr::rename(date = merged_end_date) |>
     dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
@@ -312,7 +312,7 @@ generate_visit_and_service_counts <- function(processed_data,
     intersect_overlaps(service_decision_date, service_status_start_date, lubridate::today(), merge_level = "funder_service_code") |>
     dplyr::mutate(digits_1_3 = dplyr::if_else(get_sr_code(funder_service_code) == "45", "410", "513"),
                   digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = dplyr::if_else(get_sr_code(funder_service_code) == "45", participant_age_group_code, "90")) |>
+                  digits_6_7 = dplyr::if_else(get_sr_code(funder_service_code) == "45", participant_funder_age_group_code, "90")) |>
     assemble_statistical_account() |>
     dplyr::rename(date = merged_end_date) |>
     dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
@@ -321,7 +321,7 @@ generate_visit_and_service_counts <- function(processed_data,
     intersect_overlaps(service_decision_date, service_status_start_date, lubridate::today(), merge_level = "service_name") |>
     dplyr::mutate(digits_1_3 = dplyr::if_else(get_sr_code(funder_service_code) == "45", "410", "513"),
                   digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = dplyr::if_else(get_sr_code(funder_service_code) == "45", participant_age_group_code, "90")) |>
+                  digits_6_7 = dplyr::if_else(get_sr_code(funder_service_code) == "45", participant_funder_age_group_code, "90")) |>
     assemble_statistical_account() |>
     dplyr::rename(date = merged_end_date) |>
     dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
@@ -386,7 +386,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::mutate(digits_1_3 = dplyr::case_when(activity_type == "Non-face-to-face" ~ "451",
                                   activity_type %in% c("Face-to-face", "Face-to-face Virtual") ~ "450"),
                   digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6 = stringr::str_sub(participant_age_group_code, 1, 1),
+                  digits_6 = stringr::str_sub(participant_funder_age_group_code, 1, 1),
                   digits_7 = dplyr::if_else(activity_type == "Face-to-face Virtual", "1", "0"),
                   digits_6_7 = paste0(digits_6, digits_7)) |>
     assemble_statistical_account()
@@ -423,7 +423,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::mutate(digits_1_3 = dplyr::case_when(activity_type == "Non-face-to-face" ~ "451",
                                   activity_type %in% c("Face-to-face", "Face-to-face Virtual") ~ "450"),
                   digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6 = stringr::str_sub(participant_age_group_code, 1, 1),
+                  digits_6 = stringr::str_sub(participant_funder_age_group_code, 1, 1),
                   digits_7 = dplyr::if_else(activity_type == "Face-to-face Virtual", "1", "0"),
                   digits_6_7 = paste0(digits_6, digits_7)) |>
     assemble_statistical_account() |>
@@ -492,7 +492,7 @@ generate_visit_and_service_counts <- function(processed_data,
     filter_eligible("454") |>
     dplyr::mutate(digits_1_3 = "454",
                   digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = participant_age_group_code) |>
+                  digits_6_7 = participant_funder_age_group_code) |>
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
 
@@ -540,7 +540,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::mutate(digits_1_3 = dplyr::case_when(activity_type == "Non-face-to-face" ~ "484",
                                   activity_type %in% c("Face-to-face", "Face-to-face Virtual") ~ "483"),
                   digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6 = stringr::str_sub(participant_age_group_code, 1, 1),
+                  digits_6 = stringr::str_sub(participant_funder_age_group_code, 1, 1),
                   digits_7 = dplyr::case_when(activity_type == "Face-to-face" ~ 1,
                                 activity_type == "Face-to-face Virtual" ~ 3,
                                 activity_type == "Non-face-to-face" ~ 0,
@@ -584,7 +584,7 @@ generate_visit_and_service_counts <- function(processed_data,
     merge_overlaps(service_decision_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
     dplyr::mutate(digits_1_3 = "489",
                   digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = participant_age_group_code) |>
+                  digits_6_7 = participant_funder_age_group_code) |>
     assemble_statistical_account() |>
     dplyr::rename(date = merged_start_date) |>
     dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
@@ -593,7 +593,7 @@ generate_visit_and_service_counts <- function(processed_data,
     merge_overlaps(service_decision_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
     dplyr::mutate(digits_1_3 = "489",
                   digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = participant_age_group_code) |>
+                  digits_6_7 = participant_funder_age_group_code) |>
     assemble_statistical_account() |>
     dplyr::rename(date = merged_start_date) |>
     dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
@@ -736,7 +736,7 @@ generate_visit_and_service_counts <- function(processed_data,
     # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
     dplyr::mutate(fiscal_year = lubridate::quarter(merged_start_date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
     dplyr::group_by(participant_id, sr_code, fiscal_year) |>
-    dplyr::mutate(participant_age_group_code = min(participant_age_group_code)) |>
+    dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
     dplyr::ungroup() |>
 
     # add organizational functional centre
@@ -745,7 +745,7 @@ generate_visit_and_service_counts <- function(processed_data,
     # assemble funder_statistical_account_code
     dplyr::mutate(digits_1_3 = "501",
                   digits_4_5 = sr_code,
-                  digits_6_7 = participant_age_group_code) |>
+                  digits_6_7 = participant_funder_age_group_code) |>
     assemble_statistical_account() |>
 
     dplyr::rename(date = merged_start_date) |>
@@ -770,27 +770,27 @@ generate_visit_and_service_counts <- function(processed_data,
     calc_fc_506 <- calc_506 |>
 
       # find first date within functional centre (sum of service durations == 0)
-      dplyr::group_by(date, participant_id, participant_age_group_code, funder_service_code) |>
+      dplyr::group_by(date, participant_id, participant_funder_age_group_code, funder_service_code) |>
       dplyr::summarize(service_status_duration = sum(service_status_duration)) |>
       dplyr::ungroup() |>
       dplyr::filter(service_status_duration == 0) |>
 
       dplyr::mutate(digits_1_3 = "506",
                     digits_4_5 = get_sr_code(funder_service_code),
-                    digits_6_7 = participant_age_group_code) |>
+                    digits_6_7 = participant_funder_age_group_code) |>
       assemble_statistical_account() |>
       dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
 
     calc_service_506 <- calc_506 |>
       # find first date within service (sum of service durations)
-      dplyr::group_by(date, participant_id, participant_age_group_code, funder_service_code, service_name) |>
+      dplyr::group_by(date, participant_id, participant_funder_age_group_code, funder_service_code, service_name) |>
       dplyr::summarize(service_status_duration = sum(service_status_duration)) |>
       dplyr::ungroup() |>
       dplyr::filter(service_status_duration == 0) |>
 
       dplyr::mutate(digits_1_3 = "506",
                     digits_4_5 = get_sr_code(funder_service_code),
-                    digits_6_7 = participant_age_group_code) |>
+                    digits_6_7 = participant_funder_age_group_code) |>
       assemble_statistical_account() |>
       dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
   }
@@ -803,20 +803,20 @@ generate_visit_and_service_counts <- function(processed_data,
 
     calc_fc_506 <- calc_506 |>
       merge_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
-      dplyr::distinct(participant_id, participant_age_group_code, service_first_direct_activity, funder_service_code) |>
+      dplyr::distinct(participant_id, participant_funder_age_group_code, service_first_direct_activity, funder_service_code) |>
       dplyr::mutate(digits_1_3 = "506",
                     digits_4_5 = get_sr_code(funder_service_code),
-                    digits_6_7 = participant_age_group_code) |>
+                    digits_6_7 = participant_funder_age_group_code) |>
       assemble_statistical_account() |>
       dplyr::rename(date = service_first_direct_activity) |>
       dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
 
     calc_service_506 <- calc_506 |>
       merge_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
-      dplyr::distinct(participant_id, participant_age_group_code, service_first_direct_activity, funder_service_code, service_name) |>
+      dplyr::distinct(participant_id, participant_funder_age_group_code, service_first_direct_activity, funder_service_code, service_name) |>
       dplyr::mutate(digits_1_3 = "506",
                     digits_4_5 = get_sr_code(funder_service_code),
-                    digits_6_7 = participant_age_group_code) |>
+                    digits_6_7 = participant_funder_age_group_code) |>
       assemble_statistical_account() |>
       dplyr::rename(date = service_first_direct_activity) |>
       dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
