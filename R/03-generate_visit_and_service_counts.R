@@ -143,11 +143,11 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::rename(date = activity_date)
 
   calc_fc_266 <- calc_266 |>
-    dplyr::distinct(date, funder_service_code, group_id, funder_statistical_account_code) |>
+    dplyr::distinct(date, funder_service_code, activity_group_id, funder_statistical_account_code) |>
     dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
 
   calc_service_266 <- calc_266 |>
-    dplyr::distinct(date, funder_service_code, service_name, group_id, funder_statistical_account_code) |>
+    dplyr::distinct(date, funder_service_code, service_name, activity_group_id, funder_statistical_account_code) |>
     dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
 
 
@@ -708,12 +708,12 @@ generate_visit_and_service_counts <- function(processed_data,
              ))
 
   calc_fc_492 <- calc_492 |>
-    dplyr::distinct(activity_date, group_id, funder_service_code, funder_statistical_account_code) |>
+    dplyr::distinct(activity_date, activity_group_id, funder_service_code, funder_statistical_account_code) |>
     dplyr::rename(date = activity_date) |>
     dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
 
   calc_service_492 <- calc_492 |>
-    dplyr::distinct(activity_date, group_id, funder_service_code, service_name, funder_statistical_account_code) |>
+    dplyr::distinct(activity_date, activity_group_id, funder_service_code, service_name, funder_statistical_account_code) |>
     dplyr::rename(date = activity_date) |>
     dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
 
