@@ -32,12 +32,12 @@ generate_visit_and_service_counts <- function(processed_data,
     filter_eligible("248") |>
     dplyr::mutate(digits_1_3 = "248",
                   digits_4_5 = "80",
-                  digits_6_7 = dplyr::case_when(stringr::str_detect(activity_type, "Hot") ~ "12",
-                                  stringr::str_detect(activity_type, "Cold") ~ "12",
-                                  stringr::str_detect(activity_type, "Frozen") ~ "14",
-                                  stringr::str_detect(activity_type, "Soup") |
-                                    stringr::str_detect(activity_type, "Dessert") |
-                                    stringr::str_detect(activity_type, "Side") ~ "16")) |>
+                  digits_6_7 = dplyr::case_when(stringr::str_detect(service_sub_service_name, "Hot") ~ "12",
+                                  stringr::str_detect(service_sub_service_name, "Cold") ~ "12",
+                                  stringr::str_detect(service_sub_service_name, "Frozen") ~ "14",
+                                  stringr::str_detect(service_sub_service_name, "Soup") |
+                                    stringr::str_detect(service_sub_service_name, "Dessert") |
+                                    stringr::str_detect(service_sub_service_name, "Side") ~ "16")) |>
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
 
