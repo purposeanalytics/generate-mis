@@ -70,7 +70,7 @@ process_data <- function(data_folder, debug){
 
   mis_service_history <- services |>
     # filter on Alayacare or TELUS eligibility criteria
-    dplyr::filter(stringr::str_detect(service_id, "--80") | stringr::str_sub(funder_service_code, 2, 2) == "2") |>
+    dplyr::filter(stringr::str_detect(service_id, "--80") | stringr::str_sub(funder_service_code, 2, 2) == "2" | stringr::str_sub(funder_service_code, 2, 2) == "3") |>
     dplyr::filter(!service_enrollment_id %in% non_admissions) |>
 
     # remove "Waiting for Service Initiation" as this is only counted for time spent on waitlist; waiting for assessment then becomes the time from referral to decision date
@@ -108,7 +108,7 @@ process_data <- function(data_folder, debug){
   rlog::log_info("Building MIS visits table")
 
   mis_visits <- activities |>
-    dplyr::filter(stringr::str_detect(service_id, "--80") | stringr::str_sub(funder_service_code, 2, 2) == "2") |>
+    dplyr::filter(stringr::str_detect(service_id, "--80") | stringr::str_sub(funder_service_code, 2, 2) == "2" | stringr::str_sub(funder_service_code, 2, 2) == "3") |>
     dplyr::filter(activity_status == "Completed" & participant_id != "Unregistered") |>
     dplyr::filter(activity_type %in% c("Face-to-face", "Face-to-face Virtual", "Non-face-to-face", "Assessment") | activity_individual_group == "Group" | funder_service_code == "72 5 82 10") |>
 
