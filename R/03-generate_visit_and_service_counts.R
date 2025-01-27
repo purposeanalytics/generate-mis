@@ -17,7 +17,7 @@ generate_visit_and_service_counts <- function(processed_data,
   mis_daily_census <- processed_data$mis_daily_census
 
   # S248 ** ** Meals Delivered (Number of)
-  # Report for FC 7258210 (Meals Delivery Services) at combined or detailed (hot meal, frozen meal and side dish) level but not both.  Beverages are not counted.  Refer to Section 10.10.3 FC 7258210 for examples.
+  # Report for FC 72 5 82 10 (Meals Delivery Services) at combined or detailed (hot meal, frozen meal and side dish) level but not both.  Beverages are not counted.  Refer to Section 10.10.3 FC 72 5 82 10 for examples.
   #
   # Report the number of meals delivered at combined or detailed level but not both.
   # •	S248**10 Meal (combined) = For 1 hot meal, count as 1; for 1 frozen meal, count as 1; for side dish (additional order) – count every 2 side dishes as 1 meal.
@@ -881,10 +881,10 @@ generate_visit_and_service_counts <- function(processed_data,
   # -	Relevant S512* can be reported for a SR assessed as requiring only a specific service (e.g. S5128022 Assessment Complete/Outcome - Supportive Housing for SRs that will receive assisted living services)
   # -	S512**12 (eligible in-home services – admitted) is used when a client is assessed as requiring multi service
   #
-  # Report in a 725* service delivery FC
+  # Report in a 72 5* service delivery FC
   # -		The account can be reported in the FC where the assessment is completed
   # -		S512**12  (eligible in-home services – admitted) is usually reported for a completed assessment for a client who is eligible for one or more service(s).
-  # The completion of a client assessment cannot be reported as CSS SR activity (e.g. visit) in a 725* service delivery FC except for the Case Management FC; where the client assessment is part of the mandate of the case management FC.  A client activity statistic is only reported when service is provided to or received by a SR and is within the scope of the individual FC’s service mandate/definition.
+  # The completion of a client assessment cannot be reported as CSS SR activity (e.g. visit) in a 7 25* service delivery FC except for the Case Management FC; where the client assessment is part of the mandate of the case management FC.  A client activity statistic is only reported when service is provided to or received by a SR and is within the scope of the individual FC’s service mandate/definition.
 
   rlog::log_info("Generating S512 statistic")
 

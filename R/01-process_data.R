@@ -113,7 +113,7 @@ process_data <- function(data_folder, debug){
     dplyr::filter(activity_type %in% c("Face-to-face", "Face-to-face Virtual", "Non-face-to-face", "Assessment") | activity_individual_group == "Group" | funder_service_code == "72 5 82 10") |>
 
     # include all activity_durations for Transportation
-    dplyr::mutate(activity_duration = dplyr::if_else(funder_service_code == "725 82 14", dplyr::if_else(activity_duration < 5, 6, activity_duration), activity_duration))
+    dplyr::mutate(activity_duration = dplyr::if_else(funder_service_code == "72 5 82 14", dplyr::if_else(activity_duration < 5, 6, activity_duration), activity_duration))
 
   if(!("participant_ohrs_special_needs" %in% colnames(mis_visits))){
     mis_visits <- mis_visits |>

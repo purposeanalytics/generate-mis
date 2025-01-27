@@ -485,12 +485,12 @@ generate_census_counts <- function(processed_data,
   # •	S955 80 25	Individuals Served – Living with affects of HIV/AIDS
   # The sum of S955 80 10 to S955 80 25 should equal to the total reported in S455 80 ** under the same FC.
   # S955 80 10/15/20/25 accounts are mandatory reporting for:
-  #   o	FC 725 82 45 (Assisted Living Service)
-  #   o	FC 725 82 20 (Adult Day Services)
-  #   o	FC 725 82 31 (Homemaking)
-  #   o	FC 725 82 33 (Personal Support/Independence Training)
-  #   o	FC 725 82 34 (Respite)
-  #   o	FC 725 82 35 (Combined PS/HM/Respite Services)
+  #   o	FC 72 5 82 45 (Assisted Living Service)
+  #   o	FC 72 5 82 20 (Adult Day Services)
+  #   o	FC 72 5 82 31 (Homemaking)
+  #   o	FC 72 5 82 33 (Personal Support/Independence Training)
+  #   o	FC 72 5 82 34 (Respite)
+  #   o	FC 72 5 82 35 (Combined PS/HM/Respite Services)
   # S955 80 22 High Risk Senior is mandatory reporting for FC 725 82 45 Assisted Living Services.
 
   rlog::log_info("Generating S955 statistic")
