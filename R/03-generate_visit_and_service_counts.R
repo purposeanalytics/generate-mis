@@ -443,40 +443,44 @@ generate_visit_and_service_counts <- function(processed_data,
 
   rlog::log_info("Generating S452 60 00 & S452 65 00 statistic")
 
-  calc_452_60_00 <- mis_unregistered_interactions |>
-    filter_eligible("452") |>
-    dplyr::filter(activity_individual_group == "Individual" & get_sr_code(funder_service_code) == "80") |>
-    dplyr::mutate(digits_1_3 = "452",
-                  digits_4_5 = "60",
-                  digits_6_7 = "00") |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = activity_date)
 
-  calc_fc_452_60_00 <- calc_452_60_00 |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+  if(fc_452_version == "verCSS"){
+    calc_452_60_00 <- mis_unregistered_interactions |>
+      filter_eligible("452") |>
+      # dplyr::filter(activity_individual_group == "Individual" & get_sr_code(funder_service_code) == "80") |>
+      dplyr::mutate(digits_1_3 = "452",
+                    digits_4_5 = "60",
+                    digits_6_7 = "00") |>
+      assemble_statistical_account() |>
+      dplyr::rename(date = activity_date)
 
-  calc_service_452_60_00 <- calc_452_60_00 |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+    calc_fc_452_60_00 <- calc_452_60_00 |>
+      dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
+      dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
 
+    calc_service_452_60_00 <- calc_452_60_00 |>
+      dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
+      dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+  }
 
-  calc_452_65_00 <- mis_unregistered_interactions |>
-    filter_eligible("452") |>
-    dplyr::filter(activity_individual_group == "Individual" & get_sr_code(funder_service_code) != "80") |>
-    dplyr::mutate(digits_1_3 = "452",
-                  digits_4_5 = "65",
-                  digits_6_7 = "00") |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = activity_date)
+  if(fc_452_version == "verCMHA"){
+    calc_452_65_00 <- mis_unregistered_interactions |>
+      filter_eligible("452") |>
+      # dplyr::filter(activity_individual_group == "Individual" & get_sr_code(funder_service_code) != "80") |>
+      dplyr::mutate(digits_1_3 = "452",
+                    digits_4_5 = "65",
+                    digits_6_7 = "00") |>
+      assemble_statistical_account() |>
+      dplyr::rename(date = activity_date)
 
-  calc_fc_452_65_00 <- calc_452_65_00 |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+    calc_fc_452_65_00 <- calc_452_65_00 |>
+      dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
+      dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
 
-  calc_service_452_65_00 <- calc_452_65_00 |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+    calc_service_452_65_00 <- calc_452_65_00 |>
+      dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
+      dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+  }
 
 
   # S454 ** ** Hours of Care / Hours of Service – In House ----
