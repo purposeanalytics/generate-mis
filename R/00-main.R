@@ -9,6 +9,7 @@
 #' @examples
 generate_tables <- function(data_folder = here::here("data"),
                             fc_450_version = "verA",
+                            fc_452_version = "verCSS",
                             fc_455_version = "verA",
                             fc_506_version = "verA",
                             debug = FALSE) {
