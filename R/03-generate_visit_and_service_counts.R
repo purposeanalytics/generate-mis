@@ -446,7 +446,11 @@ generate_visit_and_service_counts <- function(processed_data,
 
 
   if(fc_452_version == "verCSS"){
+<<<<<<< HEAD
     calc_452_xx_00 <- mis_unregistered_interactions |>
+=======
+    calc_452_60_00 <- mis_unregistered_interactions |>
+>>>>>>> 89b06a7901a56db2a59f7d6dc0ef634513c7b826
       filter_eligible("452") |>
       # dplyr::filter(activity_individual_group == "Individual" & get_sr_code(funder_service_code) == "80") |>
       dplyr::mutate(digits_1_3 = "452",
@@ -455,17 +459,29 @@ generate_visit_and_service_counts <- function(processed_data,
       assemble_statistical_account() |>
       dplyr::rename(date = activity_date)
 
+<<<<<<< HEAD
     calc_452_xx_00 <- calc_452_xx_00 |>
       dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
       dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
 
     calc_service_452_xx_00 <- calc_452_xx_00 |>
+=======
+    calc_fc_452_60_00 <- calc_452_60_00 |>
+      dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
+      dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+
+    calc_service_452_60_00 <- calc_452_60_00 |>
+>>>>>>> 89b06a7901a56db2a59f7d6dc0ef634513c7b826
       dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
       dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
   }
 
   if(fc_452_version == "verCMHA"){
+<<<<<<< HEAD
     calc_452_xx_00 <- mis_unregistered_interactions |>
+=======
+    calc_452_65_00 <- mis_unregistered_interactions |>
+>>>>>>> 89b06a7901a56db2a59f7d6dc0ef634513c7b826
       filter_eligible("452") |>
       # dplyr::filter(activity_individual_group == "Individual" & get_sr_code(funder_service_code) != "80") |>
       dplyr::mutate(digits_1_3 = "452",
@@ -474,11 +490,19 @@ generate_visit_and_service_counts <- function(processed_data,
       assemble_statistical_account() |>
       dplyr::rename(date = activity_date)
 
+<<<<<<< HEAD
     calc_fc_452_xx_00 <- calc_452_xx_00 |>
       dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
       dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
 
     calc_service_452_xx_00 <- calc_452_xx_00 |>
+=======
+    calc_fc_452_65_00 <- calc_452_65_00 |>
+      dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
+      dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+
+    calc_service_452_65_00 <- calc_452_65_00 |>
+>>>>>>> 89b06a7901a56db2a59f7d6dc0ef634513c7b826
       dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
       dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
   }
