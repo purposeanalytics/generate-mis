@@ -446,11 +446,11 @@ generate_visit_and_service_counts <- function(processed_data,
 
 
   if(fc_452_version == "verCSS"){
-    digits_4_5 == "60"
+    digits_4_5 <- "60"
   }
 
   if(fc_452_version == "verCMHA"){
-    digits_4_5 == "65"
+    digits_4_5 <- "65"
   }
 
   calc_452_xx_00 <- mis_unregistered_interactions |>
