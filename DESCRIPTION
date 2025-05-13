@@ -20,6 +20,6 @@ Imports:
     tictoc,
     tidyr
 Depends: 
-    R (>= 2.10)
+    R (>= 3.5)
 URL: https://github.com/purposeanalytics/generateMIS
 BugReports: https://github.com/purposeanalytics/generateMIS/issues
