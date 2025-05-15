@@ -533,9 +533,11 @@ generate_visit_and_service_counts <- function(processed_data,
                                   activity_type %in% c("Face-to-face", "Face-to-face Virtual") ~ "483"),
                   digits_4_5 = get_sr_code(funder_service_code),
                   digits_6 = stringr::str_sub(participant_funder_age_group_code, 1, 1),
-                  digits_7 = dplyr::case_when(activity_type == "Face-to-face" ~ 1,
+                  digits_7 = dplyr::case_when(
+                                activity_type == "Face-to-face" ~ 1,
                                 activity_type == "Face-to-face Virtual" ~ 3,
                                 activity_type == "Non-face-to-face" ~ 0,
+                                activity_individual_or_group == "Group" ~ 1,
                                 .default = 0),
                   digits_6_7 = paste0(digits_6, digits_7)) |>
     assemble_statistical_account() |>
