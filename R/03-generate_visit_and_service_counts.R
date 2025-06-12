@@ -537,7 +537,7 @@ generate_visit_and_service_counts <- function(processed_data,
                                 activity_type == "Face-to-face" ~ 1,
                                 activity_type == "Face-to-face Virtual" ~ 3,
                                 activity_type == "Non-face-to-face" ~ 0,
-                                activity_individual_or_group == "Group" ~ 1,
+                                activity_individual_group == "Group" ~ 1,
                                 .default = 0),
                   digits_6_7 = paste0(digits_6, digits_7)) |>
     assemble_statistical_account() |>
