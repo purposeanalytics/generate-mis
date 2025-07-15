@@ -134,7 +134,7 @@ process_data <- function(data_folder, debug){
   rlog::log_info("Building MIS unregistered interactions table")
 
   mis_unregistered_interactions <- activities |>
-    dplyr::filter(stringr::str_detect(service_id, "--80") | stringr::str_sub(funder_service_code, 2, 2) == "2") |>
+    dplyr::filter(stringr::str_detect(service_id, "--80") | stringr::str_sub(funder_service_code, 2, 2) == "2" | stringr::str_sub(funder_service_code, 2, 2) == "3") |>
     dplyr::filter(activity_status == "Completed" & participant_id == "Unregistered")
 
 
