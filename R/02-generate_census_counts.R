@@ -258,7 +258,6 @@ generate_census_counts <- function(processed_data,
   if(fc_455_version == "verA"){
     ## Service enrollment with at least one visit calculation
     calc_org_855 <- mis_daily_census |>
-      filter_eligible("855") |>
       dplyr::filter(service_status == "Active") |>
       dplyr::distinct(date, participant_id,  participant_funder_age_group_code) |>
 
@@ -285,7 +284,6 @@ generate_census_counts <- function(processed_data,
   if(fc_455_version == "verB"){
     ## Visit-based calculation
     calc_org_855 <- mis_visits |>
-      filter_eligible("855") |>
       dplyr::distinct(activity_date, participant_id, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
@@ -309,7 +307,6 @@ generate_census_counts <- function(processed_data,
   if(fc_455_version == "verC"){
     ## Service enrollment-based calculation
     calc_org_855 <- mis_daily_census |>
-      filter_eligible("855") |>
       dplyr::filter(service_status == "Active") |>
       dplyr::distinct(date, participant_id,  participant_funder_age_group_code) |>
 
