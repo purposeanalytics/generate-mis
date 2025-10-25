@@ -841,7 +841,7 @@ generate_visit_and_service_counts <- function(processed_data,
     # group by participant to set one discharge status
     dplyr::group_by(participant_id) |>
     dplyr::mutate(digits_1_3 = "511",
-                  digits_4_5 = get_sr_code(funder_service_code),
+                  digits_4_5 = "80",
                   digits_6_7 = dplyr::first(service_status_reason_code)) |>
     dplyr::ungroup() |>
     assemble_statistical_account() |>
@@ -858,7 +858,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::mutate(funder_service_code = "82 9 90") |>
 
     dplyr::mutate(digits_1_3 = "511",
-                  digits_4_5 = get_sr_code(funder_service_code),
+                  digits_4_5 = "25",
                   digits_6_7 = "90") |>
     assemble_statistical_account() |>
     dplyr::rename(date = merged_end_date) |>
