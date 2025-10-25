@@ -482,6 +482,8 @@ generate_visit_and_service_counts <- function(processed_data,
 
   calc_454 <- mis_visits |>
     filter_eligible("454") |>
+    # remove indirect and clinical entries
+    dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
     dplyr::mutate(digits_1_3 = "454",
                   digits_4_5 = get_sr_code(funder_service_code),
                   digits_6_7 = participant_funder_age_group_code) |>
