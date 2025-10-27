@@ -261,8 +261,8 @@ generate_census_counts <- function(processed_data,
 
   if(fc_455_version == "verA"){
     ## Service enrollment with at least one visit calculation
-    calc_org_855 <- mis_daily_census |>
-      dplyr::filter(service_status == "Active") |>
+    calc_org_855_css <- mis_daily_census |>
+      dplyr::filter(service_status == "Active", get_sr_code(funder_service_code) == "80") |>
       dplyr::distinct(date, participant_id,  participant_funder_age_group_code) |>
 
       # join against visits in period (i.e. must be enrolled and have at least one visit)
@@ -279,7 +279,30 @@ generate_census_counts <- function(processed_data,
 
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "855",
-                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_4_5 = "80",
+                    digits_6_7 = paste0("5", str_sub(participant_funder_age_group_code, 1, 1))) |>
+      assemble_statistical_account() |>
+      dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
+
+    calc_org_855_cmha <- mis_daily_census |>
+      dplyr::filter(service_status == "Active", get_sr_code(funder_service_code) != "80") |>
+      dplyr::distinct(date, participant_id,  participant_funder_age_group_code) |>
+
+      # join against visits in period (i.e. must be enrolled and have at least one visit)
+      dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id")) |>
+
+      # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::group_by(participant_id, fiscal_year) |>
+      dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
+      dplyr::ungroup() |>
+
+      # add organizational functional centre
+      dplyr::mutate(funder_service_code = "82 9 90") |>
+
+      # assemble funder_statistical_account_code
+      dplyr::mutate(digits_1_3 = "855",
+                    digits_4_5 = "25",
                     digits_6_7 = paste0("5", str_sub(participant_funder_age_group_code, 1, 1))) |>
       assemble_statistical_account() |>
       dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
@@ -287,9 +310,9 @@ generate_census_counts <- function(processed_data,
 
   if(fc_455_version == "verB"){
     ## Visit-based calculation
-    calc_org_855 <- mis_visits |>
+    calc_org_855_css <- mis_visits |>
       # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face"), get_sr_code(funder_service_code) == "80") |>
       dplyr::distinct(activity_date, participant_id, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
@@ -303,7 +326,29 @@ generate_census_counts <- function(processed_data,
 
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "855",
-                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_4_5 = "80",
+                    digits_6_7 = paste0("5", str_sub(participant_funder_age_group_code, 1, 1))) |>
+      assemble_statistical_account() |>
+      dplyr::rename(date = activity_date) |>
+      dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
+
+    calc_org_855_cmha <- mis_visits |>
+      # remove indirect and clinical entries
+      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face"), get_sr_code(funder_service_code) != "80") |>
+      dplyr::distinct(activity_date, participant_id, participant_funder_age_group_code) |>
+
+      # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
+      dplyr::mutate(fiscal_year = lubridate::quarter(activity_date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::group_by(participant_id,  fiscal_year) |>
+      dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
+      dplyr::ungroup() |>
+
+      # add organizational functional centre
+      dplyr::mutate(funder_service_code = "82 9 90") |>
+
+      # assemble funder_statistical_account_code
+      dplyr::mutate(digits_1_3 = "855",
+                    digits_4_5 = "25",
                     digits_6_7 = paste0("5", str_sub(participant_funder_age_group_code, 1, 1))) |>
       assemble_statistical_account() |>
       dplyr::rename(date = activity_date) |>
@@ -312,8 +357,8 @@ generate_census_counts <- function(processed_data,
 
   if(fc_455_version == "verC"){
     ## Service enrollment-based calculation
-    calc_org_855 <- mis_daily_census |>
-      dplyr::filter(service_status == "Active") |>
+    calc_org_855_css <- mis_daily_census |>
+      dplyr::filter(service_status == "Active", get_sr_code(funder_service_code) == "80") |>
       dplyr::distinct(date, participant_id,  participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
@@ -327,7 +372,27 @@ generate_census_counts <- function(processed_data,
 
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "855",
-                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_4_5 = "80",
+                    digits_6_7 = paste0("5", str_sub(participant_funder_age_group_code, 1, 1))) |>
+      assemble_statistical_account() |>
+      dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
+
+    calc_org_855_cmha <- mis_daily_census |>
+      dplyr::filter(service_status == "Active", get_sr_code(funder_service_code) != "80") |>
+      dplyr::distinct(date, participant_id,  participant_funder_age_group_code) |>
+
+      # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::group_by(participant_id, fiscal_year) |>
+      dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
+      dplyr::ungroup() |>
+
+      # add organizational functional centre
+      dplyr::mutate(funder_service_code = "82 9 90") |>
+
+      # assemble funder_statistical_account_code
+      dplyr::mutate(digits_1_3 = "855",
+                    digits_4_5 = "25",
                     digits_6_7 = paste0("5", str_sub(participant_funder_age_group_code, 1, 1))) |>
       assemble_statistical_account() |>
       dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
@@ -638,7 +703,7 @@ generate_census_counts <- function(processed_data,
 
   rlog::log_info("Writing census-type statistics files")
 
-  mis_census_counts_by_fc <- dplyr::bind_rows(calc_fc_403, calc_fc_406, calc_fc_406_99, calc_fc_455, calc_org_855, calc_org_950_10, calc_fc_950, calc_org_955) |>
+  mis_census_counts_by_fc <- dplyr::bind_rows(calc_fc_403, calc_fc_406, calc_fc_406_99, calc_fc_455, calc_org_855_css, calc_org_855_cmha, calc_org_950_10, calc_fc_950, calc_org_955) |>
     dplyr::mutate(funder_key = paste0(funder_service_code, "_", funder_statistical_account_code))
 
   readr::write_csv(mis_census_counts_by_fc, paste0(data_folder, "/processed/mis_census_counts_by_fc.csv"), na = "")
