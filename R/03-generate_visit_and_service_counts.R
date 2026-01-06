@@ -448,7 +448,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(get_sr_code(funder_service_code) == "80") |>
     dplyr::filter(activity_individual_group == "Individual") |>
     dplyr::mutate(digits_1_3 = "452",
-                  digits_4_5 = "60",
+                  digits_4_5 = dplyr::if_else(funder_service_code == "72 5 70 10" & ir_version = "verCMHA", "65", "60"),
                   digits_6_7 = "00") |>
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
@@ -620,7 +620,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(get_sr_code(funder_service_code) == "80") |>
     dplyr::filter(activity_individual_group == "Group") |>
     dplyr::mutate(digits_1_3 = "491",
-                  digits_4_5 = "60",
+                  digits_4_5 = dplyr::if_else(funder_service_code == "72 5 70 10" & ir_version = "verCMHA", "65", "60"),
                   digits_6_7 = "10") |>
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
