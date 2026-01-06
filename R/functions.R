@@ -144,7 +144,7 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
 }
 
 
-#' Intersect overlapping program enrollments (useful for finding last discharge date)
+#' Intersect overlapping program enrollments (useful for finding last discharge date on inactive status)
 #'
 #' @param df
 #' @param dimension_start
@@ -188,3 +188,50 @@ intersect_overlaps <- function(df, dimension_start, dimension_end, report_end, m
     dplyr::ungroup()
 
 }
+
+#' Earliest overlapping program enrollments (takes first start and first end in overlap; useful for finding wait time)
+#'
+#' @param df
+#' @param dimension_start
+#' @param dimension_end
+#' @param report_end
+#' @param merge_level
+#'
+#' @return
+#' @export
+#'
+#' @examples
+earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, merge_level) {
+
+  if (merge_level == "service_name") {
+    grouping_variables <- c("funder_service_code", "service_name")
+  }
+
+  if (merge_level == "funder_service_code") {
+    grouping_variables <- c("funder_service_code")
+  }
+
+  if (merge_level == "organization") {
+    grouping_variables <- c("sr_code")
+  }
+
+  df |>
+    dplyr::mutate(end_date = dplyr::if_else(is.na({{dimension_end}}), {{report_end}} + lubridate::days(1), {{dimension_end}})) |>
+    dplyr::arrange(participant_id, {{dimension_start}}) |>
+    dplyr::mutate(sr_code = get_sr_code(funder_service_code)) |>
+    dplyr::group_by(participant_id, dplyr::pick(dplyr::all_of(grouping_variables))) |>
+    dplyr::mutate(index = c(0, cumsum(as.numeric(dplyr::lead({{dimension_start}})) >
+                                        cummax(as.numeric(end_date)))[-dplyr::n()])) |>
+    dplyr::group_by(participant_id, participant_funder_age_group_code, index, dplyr::pick(dplyr::all_of(grouping_variables))) |>
+    dplyr::summarize(
+      merged_start_date = dplyr::first({{dimension_start}}),
+      merged_end_date = dplyr::last(end_date),
+      all_starts = paste({{dimension_start}}, collapse = ", "),
+      all_ends = paste({{dimension_end}}, collapse = ", "),
+      all_funder_service_codes = paste(funder_service_code, collapse = ", "),
+      all_service_names = paste(service_name, collapse = ", "),
+      all_service_status_reasons = paste(service_status_reason, collapse = ", ")
+    ) |>
+    dplyr::ungroup()
+}
+

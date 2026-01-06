@@ -199,7 +199,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(service_status == "On Waitlist" & !is.na(service_status_end_date))
 
   calc_fc_407 <- calc_407 |>
-    intersect_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
+    earliest_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
     dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
     dplyr::mutate(digits_1_3 = "407",
                   digits_4_5 = get_sr_code(funder_service_code),
@@ -210,7 +210,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::summarize(value = sum(days_waited, na.rm = TRUE))
 
   calc_service_407 <- calc_407 |>
-    intersect_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
+    earliest_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
     dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
     dplyr::mutate(digits_1_3 = "407",
                   digits_4_5 = get_sr_code(funder_service_code),
@@ -234,7 +234,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(service_status == "Waiting for Assessment" & !is.na(service_status_end_date))
 
   calc_fc_407_99 <- calc_407_99 |>
-    intersect_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
+    earliest_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
     dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
     dplyr::mutate(digits_1_3 = "407",
                   digits_4_5 = get_sr_code(funder_service_code),
@@ -245,7 +245,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::summarize(value = sum(days_waited, na.rm = TRUE))
 
   calc_service_407_99 <- calc_407_99 |>
-    intersect_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
+    earliest_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
     dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
     dplyr::mutate(digits_1_3 = "407",
                   digits_4_5 = get_sr_code(funder_service_code),
