@@ -9,7 +9,6 @@
 #' @examples
 generate_tables <- function(data_folder = here::here("data"),
                             fc_450_version = "verA",
-                            fc_452_version = "verCSS",
                             fc_455_version = "verA",
                             fc_506_version = "verA",
                             debug = FALSE) {
@@ -23,7 +22,7 @@ generate_tables <- function(data_folder = here::here("data"),
   suppressWarnings({
     processed_data <- process_data(data_folder, debug)
     generate_census_counts(processed_data, fc_455_version)
-    generate_visit_and_service_counts(processed_data, fc_450_version, fc_452_version, fc_506_version)
+    generate_visit_and_service_counts(processed_data, fc_450_version, fc_506_version)
   })
 
   rlog::log_info("MIS table generation complete!")
