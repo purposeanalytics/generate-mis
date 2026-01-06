@@ -8,7 +8,8 @@
 #' @examples
 generate_visit_and_service_counts <- function(processed_data,
                                               fc_450_version = "verA",
-                                              fc_506_version = "verA"){
+                                              fc_506_version = "verA",
+                                              ir_version = "verCMHA"){
 
   data_folder <- processed_data$data_folder
   mis_service_history <- processed_data$mis_service_history
