@@ -202,11 +202,11 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
               all_funder_service_codes = paste(funder_service_code, collapse = ", "),
               all_service_names = paste(service_name, collapse = ", "),
               all_service_status_reasons = paste(service_status_reason, collapse = ", "),
-              service_first_direct_activity = min(service_first_direct_activity)) |>
+              service_first_direct_activity = min(service_first_direct_activity),
+              service_enrollment_id = min(service_enrollment_id)) |>
     dplyr::ungroup()
 
 }
-
 
 #' Intersect overlapping program enrollments (useful for finding last discharge date on inactive status)
 #'
