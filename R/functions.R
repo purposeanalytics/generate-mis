@@ -19,6 +19,70 @@ calculate_age <- function(df, date_of_birth, reference_date){
 }
 
 
+#' A faster method for calculating age from birth date
+#'
+#' @param df
+#' @param date_of_birth
+#' @param reference_date
+#' @param feb29_as
+#'
+#' @return
+#' @export
+#'
+#' @examples
+fast_age_calculation <- function(df, date_of_birth, reference_date, feb29_as = "feb28") {
+
+  feb29_as <- match.arg(feb29_as, c("feb28", "mar01"))
+
+  # Ensure proper types
+  df <- df %>%
+    mutate(
+      reference_date = as.Date({{reference_date}}),
+      date_of_birth  = as.Date({{date_of_birth}})
+    )
+
+  # 1) Client dimension (distinct + DOB components once)
+  participants <- df %>%
+    distinct(participant_id, date_of_birth) %>%
+    arrange(participant_id)
+
+  dob_lt   <- as.POSIXlt(participants$date_of_birth)
+  dob_year <- dob_lt$year + 1900L
+  dob_mon  <- dob_lt$mon + 1L
+  dob_day  <- dob_lt$mday
+
+  dob_mmdd <- dob_mon * 100L + dob_day
+  is_feb29 <- (dob_mon == 2L & dob_day == 29L)
+  if (feb29_as == "feb28") {
+    dob_mmdd[is_feb29] <- 228L
+  } else { # "mar01"
+    dob_mmdd[is_feb29] <- 301L
+  }
+
+  # 2) Row-wise mapping from census_table -> participants via integer index (O(N))
+  idx <- match(df$participant_id, participants$participant_id)
+
+  # 3) Date components (once for all rows)
+  dt_lt <- as.POSIXlt(df$reference_date)
+  year  <- dt_lt$year + 1900L
+  mmdd  <- (dt_lt$mon + 1L) * 100L + dt_lt$mday
+
+  # 4) Fast integer age (exact, leap rule applied above)
+  participant_age <- (year - dob_year[idx]) - as.integer(mmdd < dob_mmdd[idx])
+
+  # 5) Return with age column
+  df |> mutate(participant_age = participant_age,
+               participant_funder_age_group_code = cut(participant_age, breaks = c(0, 17, 65, 999), labels = c("60", "40", "20")),
+               participant_funder_age_group_code = coalesce(participant_funder_age_group_code, "90"),
+               participant_age_group_sort = cut(participant_age, breaks = c(0, 5, 12, 17, 24, 29, 34, 39, 44, 49, 54, 59, 64, 69, 74, 79, 84, 89, 94, 99, 999), labels = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,19,20)),
+               participant_age_group_sort = as.numeric(participant_age_group_sort),
+               participant_age_group_sort = coalesce(participant_age_group_sort, 99),
+               participant_age = floor(participant_age),
+               .after = participant_date_of_birth) |>
+    select(-date_of_birth, -reference_date)
+}
+
+
 #' Determine the service recipient code (statistical account digits 4 and 5) based on functional centre code
 #'
 #' @param fc_code
