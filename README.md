@@ -63,7 +63,7 @@ This can take one of two conditions for counting when the first service was rece
 
 **ir_version**
 
-This can take one of two conditions which assigns either CMHA or CSS statistical codes to the Information and Referral functional centre
+This can take one of two conditions which assigns either CMHA or CSS statistical codes to the Information and Referral functional centre:
 
 * `verCMHA` which sets the "Not Uniquely Identified SR Interactions" statistical code to 452 65 00
 * `verCSS` which sets the "Not Uniquely Identified SR Interactions" statistical code to 452 60 00
