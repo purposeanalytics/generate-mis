@@ -26,8 +26,10 @@ library(generateMIS)
 
 generate_tables(
   data_folder, 
+  fc_450_version = "verA"
   fc_455_version = "verA", 
-  fc_506_version = "verA"
+  fc_506_version = "verA",
+  ir_version = "verCMHA"
 )
 
 ```
@@ -37,6 +39,12 @@ generate_tables(
 **data_folder**
 
 The location on your local drive of the `data` folder containing the following sub-folders: `raw`, `interim/csv`, `interim/rds`, `processed`, `external` 
+
+**fc_450_version**
+This can take one of two conditions for counting visits under the "Visits" and "Service Provider Interactions" statistics (450 \*\* \*\*, 451 \*\* \*\*, 265 \*\* \*\*):
+
+* `verA` which excludes visits that were 5 or fewer minutes in duration (but includes entries with no reported time interval)
+* `verB` which counts all visits regardless of duration (can be necessary for some bulk notes where client management system divides total time by number of clients)
 
 **fc_455_version**
 
@@ -48,7 +56,14 @@ This can take one of three conditions for counting individuals under the "Indivi
 
 **fc_506_version**
 
-This can take on of two conditions for counting when the first service was received (506 \*\* \*\*):
+This can take one of two conditions for counting when the first service was received (506 \*\* \*\*):
 
 * `verA` which counts the date of enrollment or admission as the first service date
 * `verB` which counts the first visit after the enrollment or admission date
+
+**ir_version**
+
+This can take one of two conditions which assigns either CMHA or CSS statistical codes to the Information and Referral functional centre
+
+* `verCMHA` which sets the "Not Uniquely Identified SR Interactions" statistical code to 452 65 00
+* `verCSS` which sets the "Not Uniquely Identified SR Interactions" statistical code to 452 60 00
