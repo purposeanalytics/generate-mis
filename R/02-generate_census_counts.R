@@ -170,8 +170,9 @@ generate_census_counts <- function(processed_data,
     ## Visit-based calculation
     calc_fc_455 <- mis_visits |>
       filter_eligible("455") |>
+      # 2026-01-07 mis_visits already filtered for direct interactions
       # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+      # dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
       dplyr::distinct(activity_date, participant_id, funder_service_code, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
@@ -190,8 +191,9 @@ generate_census_counts <- function(processed_data,
 
     calc_service_455 <- mis_visits |>
       filter_eligible("455") |>
+      # 2026-01-07 mis_visits already filtered for direct interactions
       # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+      # dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
       dplyr::distinct(activity_date, participant_id, funder_service_code, service_name, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
@@ -210,7 +212,7 @@ generate_census_counts <- function(processed_data,
   }
 
   if(fc_455_version == "verC"){
-    ## Service enrollment-based calculation with
+    ## Service enrollment-based calculation
     calc_fc_455 <- mis_daily_census |>
       filter_eligible("455") |>
       dplyr::filter(service_status == "Active") |>
@@ -311,8 +313,10 @@ generate_census_counts <- function(processed_data,
   if(fc_455_version == "verB"){
     ## Visit-based calculation
     calc_org_855_css <- mis_visits |>
+      # 2026-01-07 mis_visits already filtered for direct interactions
       # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face"), get_sr_code(funder_service_code) == "80") |>
+      # dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+      dplyr::filter(get_sr_code(funder_service_code) == "80") |>
       dplyr::distinct(activity_date, participant_id, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
@@ -333,8 +337,10 @@ generate_census_counts <- function(processed_data,
       dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
 
     calc_org_855_cmha <- mis_visits |>
+      # 2026-01-07 mis_visits already filtered for direct interactions
       # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face"), get_sr_code(funder_service_code) != "80") |>
+      # dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+      dplyr::filter(get_sr_code(funder_service_code) == "80") |>
       dplyr::distinct(activity_date, participant_id, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
@@ -464,8 +470,9 @@ generate_census_counts <- function(processed_data,
     ## Visit-based calculation
     calc_org_950_10 <- mis_visits |>
       filter_eligible("950") |>
+      # 2026-01-07 mis_visits already filtered for direct interactions
       # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+      # dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
       dplyr::filter(participant_preferred_language == "French") |>
 
       # add organizational functional centre
@@ -481,8 +488,9 @@ generate_census_counts <- function(processed_data,
 
     calc_fc_950 <- mis_visits |>
       filter_eligible("950") |>
+      # 2026-01-07 mis_visits already filtered for direct interactions
       # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+      # dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
       dplyr::filter(participant_preferred_language == "French") |>
 
       # assemble funder_statistical_account_code
@@ -620,8 +628,9 @@ generate_census_counts <- function(processed_data,
   ## Visit-based calculation
     calc_org_955 <- mis_visits |>
       filter_eligible("955") |>
+      # 2026-01-07 mis_visits already filtered for direct interactions
       # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+      # dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
       dplyr::filter(!is.na(participant_ohrs_special_needs)) |>
       dplyr::distinct(activity_date, participant_id, funder_service_code, participant_ohrs_special_needs) |>
 
@@ -639,8 +648,9 @@ generate_census_counts <- function(processed_data,
 
     calc_service_955 <- mis_visits |>
       filter_eligible("955") |>
+      # 2026-01-07 mis_visits already filtered for direct interactions
       # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+      # dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
       dplyr::filter(!is.na(participant_ohrs_special_needs)) |>
       dplyr::distinct(activity_date, participant_id, funder_service_code, service_name, participant_ohrs_special_needs) |>
 
