@@ -9,6 +9,8 @@
 generate_census_counts <- function(processed_data,
                                    fc_455_version = "verA"){
 
+  rlog::log_info(glue::glue("Applying fc_455_version = '{fc_455_version}' to census counts"))
+
   data_folder <- processed_data$data_folder
   mis_service_history <- processed_data$mis_service_history
   mis_visits <- processed_data$mis_visits

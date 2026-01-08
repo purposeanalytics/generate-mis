@@ -11,6 +11,8 @@ generate_visit_and_service_counts <- function(processed_data,
                                               fc_506_version = "verA",
                                               ir_version = "verCMHA"){
 
+  rlog::log_info(glue::glue("Applying fc_450_version = '{fc_450_version}', fc_506_version = '{fc_506_version}', and ir_version = '{ir_version}' to visit and service counts"))
+
   data_folder <- processed_data$data_folder
   mis_service_history <- processed_data$mis_service_history
   mis_visits <- processed_data$mis_visits
