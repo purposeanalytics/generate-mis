@@ -587,7 +587,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
   calc_489 <- mis_service_history |>
     filter_eligible("489") |>
-    dplyr::filter(!is.na(service_decision_date))
+    dplyr::filter(service_status == "Active", !is.na(service_decision_date))
 
   calc_fc_489 <- calc_489 |>
     merge_overlaps(service_decision_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
