@@ -19,6 +19,15 @@ generate_visit_and_service_counts <- function(processed_data,
   mis_unregistered_interactions <- processed_data$mis_unregistered_interactions
   mis_daily_census <- processed_data$mis_daily_census
 
+  # Apply fc_450_version
+  if(fc_450_version == "verA"){
+
+    # interactions must be > 5 min to count; include entries with no reported time interval and all CSS Transportation
+    mis_visits <- mis_visits |>
+      dplyr::filter(activity_duration > 5 | activity_duration == 0 | is.na(activity_duration) | funder_service_code == "72 5 82 14")
+
+  }
+
   # S248 ** ** Meals Delivered (Number of)
   # Report for FC 72 5 82 10 (Meals Delivery Services) at combined or detailed (hot meal, frozen meal and side dish) level but not both.  Beverages are not counted.  Refer to Section 10.10.3 FC 72 5 82 10 for examples.
   #
@@ -76,40 +85,17 @@ generate_visit_and_service_counts <- function(processed_data,
 
   rlog::log_info("Generating S265 statistic")
 
-  if(fc_450_version == "verA"){
-
-    # interactions <= 5 min will not be counted
-    calc_265 <- mis_visits |>
-      filter_eligible("265") |>
-      # individual interactions only
-      dplyr::filter(activity_individual_group == "Individual") |>
-      # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
-      dplyr::mutate(digits_1_3 = "265",
-                    digits_4_5 = get_sr_code(funder_service_code),
-                    digits_6_7 = get_time_intervals(activity_duration)) |>
-      assemble_statistical_account() |>
-      dplyr::rename(date = activity_date)
-
-  }
-
-  if(fc_450_version == "verB"){
-
-    # set interactions under 5 min to 0 min so that they are counted as "time not reported"
-    calc_265 <- mis_visits |>
-      filter_eligible("265") |>
-      # individual interactions only
-      dplyr::filter(activity_individual_group == "Individual") |>
-      # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
-      dplyr::mutate(activity_duration == dplyr::if_else(activity_duration <= 5, 0, activity_duration)) |>
-      dplyr::mutate(digits_1_3 = "265",
-                    digits_4_5 = get_sr_code(funder_service_code),
-                    digits_6_7 = get_time_intervals(activity_duration)) |>
-      assemble_statistical_account() |>
-      dplyr::rename(date = activity_date)
-
-  }
+  calc_265 <- mis_visits |>
+    filter_eligible("265") |>
+    # individual interactions only
+    dplyr::filter(activity_individual_group == "Individual") |>
+    # remove indirect and clinical entries
+    dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+    dplyr::mutate(digits_1_3 = "265",
+                  digits_4_5 = get_sr_code(funder_service_code),
+                  digits_6_7 = get_time_intervals(activity_duration)) |>
+    assemble_statistical_account() |>
+    dplyr::rename(date = activity_date)
 
   calc_fc_265 <- calc_265 |>
     dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
@@ -355,23 +341,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
   rlog::log_info("Generating S450 & S451 statistic")
 
-
-  if(fc_450_version == "verA"){
-
-    # interactions must be > 5 min to count; include entries with no reported time interval and all CSS Transportation
-    calc_450_451 <- mis_visits |>
-      dplyr::filter(activity_duration > 5 | activity_duration == 0 | is.na(activity_duration) | funder_service_code == "72 5 82 14")
-
-  }
-
-  if(fc_450_version == "verB"){
-
-    # all interactions regardless of duration (can be required for bulk notes where time is divided across clients)
-    calc_450_451 <- mis_visits
-
-  }
-
-  calc_450_451_cmha <- calc_450_451 |>
+  calc_450_451_cmha <- mis_visits |>
     filter_eligible("450|451") |>
     # non-residential CMHA
     dplyr::filter(get_sr_code(funder_service_code) == "25") |>
@@ -411,7 +381,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
 
 
-  calc_450_451_css <- calc_450_451 |>
+  calc_450_451_css <- mis_visits |>
     filter_eligible("450|451") |>
     # clients must be uniquely identified
     dplyr::filter(!is.na(participant_id)) |>
@@ -529,8 +499,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
   rlog::log_info("Generating S483 & S484 statistic")
 
-    # use calc_450_451 to get fc_450_version
-  calc_483_484 <- calc_450_451 |>
+  calc_483_484 <- mis_visits |>
     filter_eligible("483|484") |>
     # clients must be uniquely identified
     dplyr::filter(!is.na(participant_id)) |>
