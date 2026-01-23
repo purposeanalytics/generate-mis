@@ -530,32 +530,32 @@ generate_visit_and_service_counts <- function(processed_data,
   rlog::log_info("Generating S483 & S484 statistic")
 
     # use calc_450_451 to get fc_450_version
-    calc_483_484 <- calc_450_451 |>
-      filter_eligible("483|484") |>
-      # clients must be uniquely identified
-      dplyr::filter(!is.na(participant_id)) |>
-      # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+  calc_483_484 <- calc_450_451 |>
+    filter_eligible("483|484") |>
+    # clients must be uniquely identified
+    dplyr::filter(!is.na(participant_id)) |>
+    # remove indirect and clinical entries
+    dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
 
-      # count only one attendance day per day; preferentially choose FTF over NFTF by sorting by activity_type
-      dplyr::mutate(activity_type_priority = dplyr::case_when(activity_type == "Face-to-face" ~ 1,
-                                                activity_type == "Face-to-face Virtual" ~ 2,
-                                                .default = 3)) |>
+    # count only one attendance day per day; preferentially choose FTF over NFTF by sorting by activity_type
+    dplyr::mutate(activity_type_priority = dplyr::case_when(activity_type == "Face-to-face" ~ 1,
+                                              activity_type == "Face-to-face Virtual" ~ 2,
+                                              .default = 3)) |>
 
-      # assemble statistical account
-      dplyr::mutate(digits_1_3 = dplyr::case_when(activity_type == "Non-face-to-face" ~ "484",
-                                    activity_type %in% c("Face-to-face", "Face-to-face Virtual") ~ "483"),
-                    digits_4_5 = get_sr_code(funder_service_code),
-                    digits_6 = stringr::str_sub(participant_funder_age_group_code, 1, 1),
-                    digits_7 = dplyr::case_when(
-                                  activity_type == "Face-to-face" ~ 1,
-                                  activity_type == "Face-to-face Virtual" ~ 3,
-                                  activity_type == "Non-face-to-face" ~ 0,
-                                  activity_individual_group == "Group" ~ 1,
-                                  .default = 0),
-                    digits_6_7 = paste0(digits_6, digits_7)) |>
-      assemble_statistical_account() |>
-      dplyr::rename(date = activity_date)
+    # assemble statistical account
+    dplyr::mutate(digits_1_3 = dplyr::case_when(activity_type == "Non-face-to-face" ~ "484",
+                                  activity_type %in% c("Face-to-face", "Face-to-face Virtual") ~ "483"),
+                  digits_4_5 = get_sr_code(funder_service_code),
+                  digits_6 = stringr::str_sub(participant_funder_age_group_code, 1, 1),
+                  digits_7 = dplyr::case_when(
+                                activity_type == "Face-to-face" ~ 1,
+                                activity_type == "Face-to-face Virtual" ~ 3,
+                                activity_type == "Non-face-to-face" ~ 0,
+                                activity_individual_group == "Group" ~ 1,
+                                .default = 0),
+                  digits_6_7 = paste0(digits_6, digits_7)) |>
+    assemble_statistical_account() |>
+    dplyr::rename(date = activity_date)
 
 
   calc_fc_483_484 <- calc_483_484 |>
