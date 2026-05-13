@@ -284,7 +284,7 @@ generate_census_counts <- function(processed_data,
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "855",
                     digits_4_5 = "80",
-                    digits_6_7 = paste0("5", str_sub(participant_funder_age_group_code, 1, 1))) |>
+                    digits_6_7 = paste0("5", stringr::str_sub(participant_funder_age_group_code, 1, 1))) |>
       assemble_statistical_account() |>
       dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
 
@@ -307,7 +307,7 @@ generate_census_counts <- function(processed_data,
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "855",
                     digits_4_5 = "25",
-                    digits_6_7 = paste0("5", str_sub(participant_funder_age_group_code, 1, 1))) |>
+                    digits_6_7 = paste0("5", stringr::str_sub(participant_funder_age_group_code, 1, 1))) |>
       assemble_statistical_account() |>
       dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
   }
@@ -333,7 +333,7 @@ generate_census_counts <- function(processed_data,
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "855",
                     digits_4_5 = "80",
-                    digits_6_7 = paste0("5", str_sub(participant_funder_age_group_code, 1, 1))) |>
+                    digits_6_7 = paste0("5", stringr::str_sub(participant_funder_age_group_code, 1, 1))) |>
       assemble_statistical_account() |>
       dplyr::rename(date = activity_date) |>
       dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
@@ -357,7 +357,7 @@ generate_census_counts <- function(processed_data,
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "855",
                     digits_4_5 = "25",
-                    digits_6_7 = paste0("5", str_sub(participant_funder_age_group_code, 1, 1))) |>
+                    digits_6_7 = paste0("5", stringr::str_sub(participant_funder_age_group_code, 1, 1))) |>
       assemble_statistical_account() |>
       dplyr::rename(date = activity_date) |>
       dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
@@ -381,7 +381,7 @@ generate_census_counts <- function(processed_data,
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "855",
                     digits_4_5 = "80",
-                    digits_6_7 = paste0("5", str_sub(participant_funder_age_group_code, 1, 1))) |>
+                    digits_6_7 = paste0("5", stringr::str_sub(participant_funder_age_group_code, 1, 1))) |>
       assemble_statistical_account() |>
       dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
 
@@ -401,7 +401,7 @@ generate_census_counts <- function(processed_data,
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "855",
                     digits_4_5 = "25",
-                    digits_6_7 = paste0("5", str_sub(participant_funder_age_group_code, 1, 1))) |>
+                    digits_6_7 = paste0("5", stringr::str_sub(participant_funder_age_group_code, 1, 1))) |>
       assemble_statistical_account() |>
       dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
   }
