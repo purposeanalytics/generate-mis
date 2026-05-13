@@ -36,15 +36,15 @@ fast_age_calculation <- function(df, date_of_birth, reference_date, feb29_as = "
 
   # Ensure proper types
   df <- df %>%
-    mutate(
+    dplyr::mutate(
       reference_date = as.Date({{reference_date}}),
       date_of_birth  = as.Date({{date_of_birth}})
     )
 
   # 1) Client dimension (distinct + DOB components once)
   participants <- df %>%
-    distinct(participant_id, date_of_birth) %>%
-    arrange(participant_id)
+    dplyr::distinct(participant_id, date_of_birth) %>%
+    dplyr::arrange(participant_id)
 
   dob_lt   <- as.POSIXlt(participants$date_of_birth)
   dob_year <- dob_lt$year + 1900L
@@ -71,15 +71,15 @@ fast_age_calculation <- function(df, date_of_birth, reference_date, feb29_as = "
   participant_age <- (year - dob_year[idx]) - as.integer(mmdd < dob_mmdd[idx])
 
   # 5) Return with age column
-  df |> mutate(participant_age = participant_age,
+  df |> dplyr::mutate(participant_age = participant_age,
                participant_funder_age_group_code = cut(participant_age, breaks = c(0, 17, 65, 999), labels = c("60", "40", "20")),
-               participant_funder_age_group_code = coalesce(participant_funder_age_group_code, "90"),
+               participant_funder_age_group_code = dplyr::coalesce(participant_funder_age_group_code, "90"),
                participant_age_group_sort = cut(participant_age, breaks = c(0, 5, 12, 17, 24, 29, 34, 39, 44, 49, 54, 59, 64, 69, 74, 79, 84, 89, 94, 99, 999), labels = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,19,20)),
                participant_age_group_sort = as.numeric(participant_age_group_sort),
-               participant_age_group_sort = coalesce(participant_age_group_sort, 99),
+               participant_age_group_sort = dplyr::coalesce(participant_age_group_sort, 99),
                participant_age = floor(participant_age),
                .after = participant_date_of_birth) |>
-    select(-date_of_birth, -reference_date)
+    dplyr::select(-date_of_birth, -reference_date)
 }
 
 
