@@ -161,7 +161,7 @@ process_data <- function(data_folder, debug){
     # calculate age on date
     dplyr::inner_join(participants |>
                         dplyr::select(participant_id, participant_date_of_birth, participant_ohrs_special_needs, participant_preferred_language), by = "participant_id") |>
-    calculate_age(participant_date_of_birth, date)
+    fast_age_calculation(participant_date_of_birth, date)
 
   processed_data <- list(data_folder = data_folder,
                          mis_service_history = mis_service_history,
