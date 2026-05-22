@@ -132,12 +132,12 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::rename(date = activity_date)
 
   calc_fc_266 <- calc_266 |>
-    dplyr::distinct(date, funder_service_code, activity_group_id, funder_statistical_account_code) |>
+    dplyr::distinct(date, funder_service_code, activity_group_id, funder_statistical_account_code, activity_worker_count) |>
     dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
     dplyr::summarize(value = sum(activity_worker_count, na.rm = TRUE))
 
   calc_service_266 <- calc_266 |>
-    dplyr::distinct(date, funder_service_code, service_name, activity_group_id, funder_statistical_account_code) |>
+    dplyr::distinct(date, funder_service_code, service_name, activity_group_id, funder_statistical_account_code, activity_worker_count) |>
     dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
     dplyr::summarize(value = sum(activity_worker_count, na.rm = TRUE))
 
