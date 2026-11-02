@@ -1,7 +1,7 @@
 Package: generateMIS
 Type: Package
 Title: Creates Pre-Aggregated Statistics for MOHLTC MIS Report
-Version: 0.1.2
+Version: 0.1.3
 Author: Purpose Analytics
 Maintainer: Purpose Analytics <hello@purposeanalytics.ca>
 Description: The generateMIS package transforms program data saved in Purpose Analytics' standard format into statistics required by the Ministry of Health and Long-Term Care for quarterly reporting (Chapters 7 and 10).
