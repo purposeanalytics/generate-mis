@@ -713,7 +713,7 @@ generate_visit_and_service_counts <- function(processed_data,
     merge_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "organization") |>
 
     # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-    dplyr::mutate(fiscal_year = lubridate::quarter(merged_start_date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+    dplyr::mutate(fiscal_year = lubridate::quarter(merged_start_date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
     dplyr::group_by(participant_id, sr_code, fiscal_year) |>
     dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
     dplyr::ungroup() |>

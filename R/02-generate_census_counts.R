@@ -134,7 +134,7 @@ generate_census_counts <- function(processed_data,
       dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id", "funder_service_code")) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id, funder_service_code, fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
@@ -155,7 +155,7 @@ generate_census_counts <- function(processed_data,
       dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id", "funder_service_code", "service_name")) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id, funder_service_code, service_name, fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
@@ -199,7 +199,7 @@ generate_census_counts <- function(processed_data,
       dplyr::distinct(activity_date, participant_id, funder_service_code, service_name, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(activity_date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(activity_date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id, funder_service_code, service_name, fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
@@ -221,7 +221,7 @@ generate_census_counts <- function(processed_data,
       dplyr::distinct(date, participant_id, funder_service_code, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id, funder_service_code, fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
@@ -239,7 +239,7 @@ generate_census_counts <- function(processed_data,
       dplyr::distinct(date, participant_id, funder_service_code, service_name, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id, funder_service_code, service_name, fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
@@ -273,7 +273,7 @@ generate_census_counts <- function(processed_data,
       dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id")) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, as.Date("2026-01-03"), fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id, fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
@@ -296,7 +296,7 @@ generate_census_counts <- function(processed_data,
       dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id")) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id, fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
@@ -322,7 +322,7 @@ generate_census_counts <- function(processed_data,
       dplyr::distinct(activity_date, participant_id, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(activity_date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(activity_date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id,  fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
@@ -346,7 +346,7 @@ generate_census_counts <- function(processed_data,
       dplyr::distinct(activity_date, participant_id, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(activity_date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(activity_date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id,  fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
@@ -370,7 +370,7 @@ generate_census_counts <- function(processed_data,
       dplyr::distinct(date, participant_id,  participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id, fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
@@ -390,7 +390,7 @@ generate_census_counts <- function(processed_data,
       dplyr::distinct(date, participant_id,  participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id, fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
