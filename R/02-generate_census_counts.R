@@ -342,7 +342,7 @@ generate_census_counts <- function(processed_data,
       # 2026-01-07 mis_visits already filtered for direct interactions
       # remove indirect and clinical entries
       # dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
-      dplyr::filter(get_sr_code(funder_service_code) == "80") |>
+      dplyr::filter(get_sr_code(funder_service_code) != "80") |>
       dplyr::distinct(activity_date, participant_id, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
