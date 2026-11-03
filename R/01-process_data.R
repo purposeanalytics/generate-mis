@@ -32,8 +32,6 @@ process_data <- function(data_folder, debug){
 
   service_list <- all_functional_centres_and_statistical_codes |>
     dplyr::right_join(functional_centre_mapping, by = c("funder_service_code")) |>
-    dplyr::mutate(funder_service_name = stringr::str_replace_all(funder_service_name, clean_fc_names),
-                  funder_service_name = stringr::str_squish(funder_service_name)) |>
     dplyr::mutate(funder_target_category = NA,
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "248"), "Meals Delivered-Combined", funder_target_category ),
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "266 00"), "Service Provider Group Interactions", funder_target_category ),

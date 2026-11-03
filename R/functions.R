@@ -115,6 +115,8 @@ get_sr_code <- function(fc_code) {
   code <- dplyr::case_when(
     (stringr::str_sub({{fc_code}}, 9, 10) == "76" | stringr::str_sub({{fc_code}},  9, 10) == "78") & stringr::str_sub({{fc_code}}, 6, 7) == "40" ~ "45",
     (stringr::str_sub({{fc_code}}, 9, 10) == "76" | stringr::str_sub({{fc_code}},  9, 10) == "78") & stringr::str_sub({{fc_code}}, 6, 7) != "40" ~ "25",
+    # Centralized/Coordinated Access is a CMH&A FC (OHRS Ch 7) with no 76/78 in its code
+    stringr::str_detect({{fc_code}}, "^7[23] 5 08$") ~ "25",
     .default = "80")  # if not "76" (mental health) or "78" (addictions), default to "80" (community support services)
 }
 
@@ -215,12 +217,15 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
                                  cummax(as.numeric(end_date)))[-dplyr::n()])) |>
     dplyr::group_by(participant_id, participant_funder_age_group_code, index, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::summarize(merged_start_date = dplyr::first({{dimension_start}}),
-              merged_end_date = dplyr::last(end_date),
+              # latest end in the merged period (the last-starting row may end earlier)
+              merged_end_date = max(end_date),
               all_starts = paste({{dimension_start}}, collapse = ", "),
               all_ends = paste({{dimension_end}}, collapse = ", "),
               all_funder_service_codes = paste(funder_service_code, collapse = ", "),
               all_service_names = paste(service_name, collapse = ", "),
               all_service_status_reasons = paste(service_status_reason, collapse = ", "),
+              # reason on the row that ended last (e.g. the final discharge in the period)
+              last_service_status_reason = service_status_reason[which.max(end_date)],
               service_first_direct_activity = min(service_first_direct_activity),
               service_enrollment_id = min(service_enrollment_id)) |>
     dplyr::ungroup()
@@ -284,7 +289,15 @@ intersect_overlaps <- function(df, dimension_start, dimension_end, report_end, m
 #' @export
 #'
 #' @examples
-earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, merge_level) {
+earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, merge_level, report_date) {
+
+  # optional date to report the merged period on (e.g. service start date for S407);
+  # returned as merged_report_date (latest in the period), NA if not supplied
+  if (missing(report_date)) {
+    df <- dplyr::mutate(df, .report_date = lubridate::NA_Date_)
+  } else {
+    df <- dplyr::mutate(df, .report_date = {{report_date}})
+  }
 
   if (merge_level == "service_name") {
     grouping_variables <- c("funder_service_code", "service_name")
@@ -309,6 +322,7 @@ earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, me
     dplyr::summarize(
       merged_start_date = dplyr::first({{dimension_start}}),
       merged_end_date = dplyr::last(end_date),
+      merged_report_date = max(.report_date),
       all_starts = paste({{dimension_start}}, collapse = ", "),
       all_ends = paste({{dimension_end}}, collapse = ", "),
       all_funder_service_codes = paste(funder_service_code, collapse = ", "),

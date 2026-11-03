@@ -54,9 +54,10 @@ generate_census_counts <- function(processed_data,
 
   calc_fc_406 <- mis_daily_census |>
     filter_eligible("406") |>
-    dplyr::filter(service_status == "On Waitlist") |>
     # participants who were on the waitlist at the end of the reporting period
-    # exclude those whose waitlist start and end dates are the same -- implied they were not actually on a waitlist
+    dplyr::filter(service_status == "On Waitlist") |>
+    # exclude first day of wait where duration is zero -- only count on waitlist if they wait one day or more
+    dplyr::filter(service_status_start_date != date) |>
     dplyr::distinct(date, participant_id, funder_service_code, service_status) |>
     dplyr::mutate(digits_1_3 = "406",
                   digits_4_5 = get_sr_code(funder_service_code),
@@ -92,7 +93,8 @@ generate_census_counts <- function(processed_data,
     filter_eligible("406 99") |>
     # filter participants who were pending assessment at the end of the reporting period
     dplyr::filter(service_status == "Waiting for Assessment") |>
-    # exclude first day of wait where duration is zero -- only count as waiting for assessment if they wait one day or more  dplyr::filter(service_status_start_date != date) |>
+    # exclude first day of wait where duration is zero -- only count as waiting for assessment if they wait one day or more
+    dplyr::filter(service_status_start_date != date) |>
     dplyr::distinct(date, participant_id, funder_service_code, service_status) |>
     dplyr::mutate(digits_1_3 = "406",
                   digits_4_5 = "99",
@@ -104,7 +106,8 @@ generate_census_counts <- function(processed_data,
     filter_eligible("406 99") |>
     # filter participants who were pending assessment at the end of the reporting period
     dplyr::filter(service_status == "Waiting for Assessment") |>
-    # exclude those whose start and end dates are the same -- implied they went straight to waitlist/service/non-admission
+    # exclude first day of wait where duration is zero -- only count as waiting for assessment if they wait one day or more
+    dplyr::filter(service_status_start_date != date) |>
     dplyr::distinct(date, participant_id, funder_service_code, service_name, service_status) |>
     dplyr::mutate(digits_1_3 = "406",
                   digits_4_5 = "99",
@@ -178,7 +181,7 @@ generate_census_counts <- function(processed_data,
       dplyr::distinct(activity_date, participant_id, funder_service_code, participant_funder_age_group_code) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(activity_date, fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(activity_date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id, funder_service_code, fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
@@ -273,7 +276,7 @@ generate_census_counts <- function(processed_data,
       dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id")) |>
 
       # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-      dplyr::mutate(fiscal_year = lubridate::quarter(date, as.Date("2026-01-03"), fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
+      dplyr::mutate(fiscal_year = lubridate::quarter(date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
       dplyr::group_by(participant_id, fiscal_year) |>
       dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
       dplyr::ungroup() |>
@@ -581,16 +584,14 @@ generate_census_counts <- function(processed_data,
 
   if(fc_455_version == "verA"){
     ## Service enrollment with at least one visit calculation
+    # S955 is a breakdown of S455 80 ** and is reported in the same FC (OHRS Ch. 10, 10.9.4.8), not AC 82 9 90
     calc_org_955 <- mis_daily_census |>
       filter_eligible("955") |>
-      dplyr::filter(service_status == "Active") |>
-      dplyr::distinct(date, participant_id, participant_ohrs_special_needs) |>
+      dplyr::filter(service_status == "Active" & !is.na(participant_ohrs_special_needs)) |>
+      dplyr::distinct(date, participant_id, funder_service_code, participant_ohrs_special_needs) |>
 
       # join against visits in period (i.e. must be enrolled and have at least one visit)
-      dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id")) |>
-
-      # add organizational functional centre
-      dplyr::mutate(funder_service_code = "82 9 90") |>
+      dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id", "funder_service_code")) |>
 
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "955",
@@ -605,14 +606,11 @@ generate_census_counts <- function(processed_data,
 
     calc_service_955 <- mis_daily_census |>
       filter_eligible("955") |>
-      dplyr::filter(service_status == "Active") |>
+      dplyr::filter(service_status == "Active" & !is.na(participant_ohrs_special_needs)) |>
       dplyr::distinct(date, participant_id, funder_service_code, service_name, participant_ohrs_special_needs) |>
 
       # join against visits in period (i.e. must be enrolled and have at least one visit)
       dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id", "funder_service_code", "service_name")) |>
-
-      # add organizational functional centre
-      dplyr::mutate(funder_service_code = "82 9 90") |>
 
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "955",
@@ -671,13 +669,11 @@ generate_census_counts <- function(processed_data,
 
   if(fc_455_version == "verC"){
     ## Service enrollment-based calculation
+    # S955 is a breakdown of S455 80 ** and is reported in the same FC (OHRS Ch. 10, 10.9.4.8), not AC 82 9 90
     calc_org_955 <- mis_daily_census |>
       filter_eligible("955") |>
-      dplyr::filter(service_status == "Active") |>
-      dplyr::distinct(date, participant_id, participant_ohrs_special_needs) |>
-
-      # add organizational functional centre
-      dplyr::mutate(funder_service_code = "82 9 90") |>
+      dplyr::filter(service_status == "Active" & !is.na(participant_ohrs_special_needs)) |>
+      dplyr::distinct(date, participant_id, funder_service_code, participant_ohrs_special_needs) |>
 
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "955",
@@ -692,11 +688,8 @@ generate_census_counts <- function(processed_data,
 
     calc_service_955 <- mis_daily_census |>
       filter_eligible("955") |>
-      dplyr::filter(service_status == "Active") |>
+      dplyr::filter(service_status == "Active" & !is.na(participant_ohrs_special_needs)) |>
       dplyr::distinct(date, participant_id, funder_service_code, service_name, participant_ohrs_special_needs) |>
-
-      # add organizational functional centre
-      dplyr::mutate(funder_service_code = "82 9 90") |>
 
       # assemble funder_statistical_account_code
       dplyr::mutate(digits_1_3 = "955",
