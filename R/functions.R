@@ -1,3 +1,8 @@
+# CSS case management FCs. Assessments here are client activity (visit, individual served);
+# in other CSS service delivery FCs they are not (OHRS Ch. 10, 10.9.4.4, S512).
+css_case_management_fcs <- c("72 5 82 09", "73 5 82 09")
+
+
 #' Calculate age from birth date
 #'
 #' @param df

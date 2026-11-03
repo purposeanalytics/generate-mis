@@ -422,12 +422,14 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(get_sr_code(funder_service_code) == "80") |>
     # individual interactions only
     dplyr::filter(activity_individual_group == "Individual") |>
-    # remove indirect and clinical entries
-    dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+    # remove indirect and clinical entries; assessments count as a visit only in the
+    # CSS case management FC (OHRS Ch. 10, 10.9.4.4, S512)
+    dplyr::filter(stringr::str_detect(activity_type, "ace-to-face") |
+                    (activity_type == "Assessment" & funder_service_code %in% css_case_management_fcs)) |>
 
-    # assemble statistical account
+    # assemble statistical account (assessments are reported as in-person visits)
     dplyr::mutate(digits_1_3 = dplyr::case_when(activity_type == "Non-face-to-face" ~ "451",
-                                  activity_type %in% c("Face-to-face", "Face-to-face Virtual") ~ "450"),
+                                  activity_type %in% c("Face-to-face", "Face-to-face Virtual", "Assessment") ~ "450"),
                   digits_4_5 = get_sr_code(funder_service_code),
                   digits_6 = stringr::str_sub(participant_funder_age_group_code, 1, 1),
                   digits_7 = dplyr::if_else(activity_type == "Face-to-face Virtual", "1", "0"),
@@ -509,15 +511,24 @@ generate_visit_and_service_counts <- function(processed_data,
                                               paste0(stringr::str_sub(digits_6_7, 1, 1), "1"),
                                               digits_6_7)) |>
     assemble_statistical_account() |>
-    dplyr::rename(date = activity_date)
+    dplyr::rename(date = activity_date) |>
+
+    # group sessions: hours are the session length, not length x participants
+    # (OHRS Ch. 10, 10.9.4.3.3 S454 example: two 3-hour sessions for 10 SRs = 6 hours).
+    # Each participant row carries an equal share of the session, so mixed-age groups
+    # still total the session length across age categories.
+    dplyr::group_by(date, funder_service_code, activity_group_id) |>
+    dplyr::mutate(hours = activity_duration / 60 *
+                    dplyr::if_else(activity_individual_group == "Group" & !is.na(activity_group_id), 1 / dplyr::n(), 1)) |>
+    dplyr::ungroup()
 
   calc_fc_454 <- calc_454 |>
     dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_duration/60, na.rm = TRUE))
+    dplyr::summarize(value = sum(hours, na.rm = TRUE))
 
   calc_service_454 <- calc_454 |>
     dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_duration/60, na.rm = TRUE))
+    dplyr::summarize(value = sum(hours, na.rm = TRUE))
 
   # S483 ** ** Attendance Days – Face to Face ----
   # S483 ** *1   Attendance Days – Face to Face in Person
