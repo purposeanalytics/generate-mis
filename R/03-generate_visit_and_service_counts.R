@@ -239,8 +239,15 @@ generate_visit_and_service_counts <- function(processed_data,
 
   calc_407_99 <- mis_service_history |>
     filter_eligible("407 99") |>
-    # only completed waits; open waits carry tomorrow's date as their end date
-    dplyr::filter(service_status == "Waiting for Assessment" & service_status_end_date <= lubridate::today())
+    # Only waits that ended in acceptance count (Ch. 7 s7.7.6: no days if the client is not
+    # accepted). service_decision_date is set when a client is made active or put on the
+    # waitlist/hold, so it marks acceptance. The wait runs from referral to the decision date
+    # (Ch. 7 s7.7.8, step 2). Waits with no decision yet, or that ended without one, are left out.
+    dplyr::filter(service_status == "Waiting for Assessment",
+                  !is.na(service_decision_date),
+                  service_decision_date >= service_status_start_date,
+                  service_decision_date <= lubridate::today()) |>
+    dplyr::mutate(service_status_end_date = service_decision_date)
 
   calc_fc_407_99 <- calc_407_99 |>
     earliest_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
