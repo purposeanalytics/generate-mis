@@ -193,13 +193,18 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::arrange(service_status_start_date, service_status, .by_group = TRUE) |>
     dplyr::mutate(waiting = service_status %in% c("On Waitlist", "On Hold"),
                   wait_outcome = dplyr::if_else(waiting, NA_character_, as.character(service_status)),
-                  service_start_date = dplyr::if_else(waiting, lubridate::NA_Date_, service_status_start_date)) |>
+                  service_start_date = dplyr::if_else(waiting, lubridate::NA_Date_, service_status_start_date),
+                  # service starts at enrollment into the FC (Ch. 7 s7.7.8, step 8)
+                  first_active_date = suppressWarnings(min(service_status_start_date[service_status == "Active"]))) |>
     tidyr::fill(wait_outcome, service_start_date, .direction = "up") |>
     dplyr::ungroup() |>
     # days waited stop when On Waitlist ends (whether the next status is On Hold or Active;
     # service_status_end_date is already the start of the next status), but are reported
-    # on the date service started (OHRS: reported after the service has started)
-    dplyr::filter(service_status == "On Waitlist" & wait_outcome %in% "Active")
+    # on the date service started (OHRS: reported after the service has started).
+    # Only the wait before first service counts; a return to the waitlist after service
+    # started is a data quality issue, not a wait for service initiation.
+    dplyr::filter(service_status == "On Waitlist" & wait_outcome %in% "Active" &
+                    service_status_start_date < first_active_date)
 
   calc_fc_407 <- calc_407 |>
     earliest_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code", report_date = service_start_date) |>
@@ -234,7 +239,8 @@ generate_visit_and_service_counts <- function(processed_data,
 
   calc_407_99 <- mis_service_history |>
     filter_eligible("407 99") |>
-    dplyr::filter(service_status == "Waiting for Assessment" & !is.na(service_status_end_date))
+    # only completed waits; open waits carry tomorrow's date as their end date
+    dplyr::filter(service_status == "Waiting for Assessment" & service_status_end_date <= lubridate::today())
 
   calc_fc_407_99 <- calc_407_99 |>
     earliest_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
