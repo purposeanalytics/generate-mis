@@ -223,17 +223,7 @@ assemble_statistical_account <- function(df){
 #' @examples
 merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge_level){
 
-  if(merge_level == "service_name") {
-    grouping_variables <-  c("funder_service_code", "service_name")
-  }
-
-  if(merge_level == "funder_service_code") {
-    grouping_variables <-  c("funder_service_code")
-  }
-
-  if(merge_level == "organization") {
-    grouping_variables <-  c("sr_code")
-  }
+  grouping_variables <- overlap_grouping(merge_level)
 
   df |>
     dplyr::mutate(end_date = dplyr::if_else(is.na({{dimension_end}}), {{report_end}} + lubridate::days(1), {{dimension_end}})) |>
@@ -275,17 +265,7 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
 #' @examples
 intersect_overlaps <- function(df, dimension_start, dimension_end, report_end, merge_level){
 
-  if(merge_level == "service_name") {
-    grouping_variables <-  c("funder_service_code", "service_name")
-  }
-
-  if(merge_level == "funder_service_code") {
-    grouping_variables <-  c("funder_service_code")
-  }
-
-  if(merge_level == "organization") {
-    grouping_variables <-  c("sr_code")
-  }
+  grouping_variables <- overlap_grouping(merge_level)
 
   df |>
     dplyr::mutate(end_date = dplyr::if_else(is.na({{dimension_end}}), {{report_end}} + lubridate::days(1), {{dimension_end}})) |>
@@ -328,17 +308,7 @@ earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, me
     df <- dplyr::mutate(df, .report_date = {{report_on}})
   }
 
-  if (merge_level == "service_name") {
-    grouping_variables <- c("funder_service_code", "service_name")
-  }
-
-  if (merge_level == "funder_service_code") {
-    grouping_variables <- c("funder_service_code")
-  }
-
-  if (merge_level == "organization") {
-    grouping_variables <- c("sr_code")
-  }
+  grouping_variables <- overlap_grouping(merge_level)
 
   df |>
     dplyr::mutate(end_date = dplyr::if_else(is.na({{dimension_end}}), {{report_end}} + lubridate::days(1), {{dimension_end}})) |>
@@ -361,3 +331,63 @@ earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, me
     dplyr::ungroup()
 }
 
+
+
+# Grain ----
+# Most statistics are reported at two grains: by functional centre ("fc"), and by service
+# within a functional centre ("service"). grain_cols() gives the columns that identify the
+# reporting unit, so each statistic is written once and run at both grains.
+grain_cols <- function(grain) {
+  switch(match.arg(grain, c("fc", "service")),
+         fc = "funder_service_code",
+         service = c("funder_service_code", "service_name"))
+}
+
+# Columns the overlap helpers group by. Accepts a grain ("fc", "service") or the older
+# names ("funder_service_code", "service_name"), plus "organization" (by SR code).
+overlap_grouping <- function(merge_level) {
+  switch(merge_level,
+         fc = , funder_service_code = grain_cols("fc"),
+         service = , service_name = grain_cols("service"),
+         organization = "sr_code",
+         stop("unknown merge_level: ", merge_level, call. = FALSE))
+}
+
+# Count rows per date, reporting unit and statistical account
+count_by_grain <- function(df, grain) {
+  df |>
+    dplyr::count(date, dplyr::across(dplyr::all_of(grain_cols(grain))), funder_statistical_account_code, name = "value")
+}
+
+# Sum an expression per date, reporting unit and statistical account
+sum_by_grain <- function(df, grain, value) {
+  df |>
+    dplyr::group_by(date, dplyr::across(dplyr::all_of(grain_cols(grain))), funder_statistical_account_code) |>
+    dplyr::summarize(value = {{ value }})
+}
+
+# Fiscal year (April to March) as the 4-digit year it starts in
+fiscal_year <- function(date) {
+  lubridate::quarter(date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)
+}
+
+# Use each person's lowest age group code in the fiscal year (the age group at their latest
+# contact, as codes run 20 elderly < 40 adult < 60 paediatric), within the `by` columns.
+min_age_group_by_fiscal_year <- function(df, by = character(0)) {
+  df |>
+    dplyr::mutate(fiscal_year = fiscal_year(date)) |>
+    dplyr::group_by(dplyr::pick(dplyr::all_of(c("participant_id", by, "fiscal_year")))) |>
+    dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
+    dplyr::ungroup()
+}
+
+# Keep one row per person per day in each reporting unit, preferring face-to-face in person,
+# then virtual, then non-face-to-face (activity_type_priority 1, 2, 3)
+one_per_person_per_day <- function(df, grain) {
+  keys <- c(grain_cols(grain), "participant_id", "date")
+  df |>
+    dplyr::group_by(dplyr::pick(dplyr::all_of(keys))) |>
+    dplyr::arrange(dplyr::pick(dplyr::all_of(c(keys, "activity_type_priority")))) |>
+    dplyr::slice(1) |>
+    dplyr::ungroup()
+}

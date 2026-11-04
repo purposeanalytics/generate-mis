@@ -23,6 +23,11 @@ generate_visit_and_service_counts <- function(processed_data,
   # Apply fc_450_version (same rule as in generate_census_counts)
   mis_visits <- apply_fc_450_version(mis_visits, fc_450_version)
 
+  # Each statistic builds its rows once (calc_*), then report_*(grain) totals them by FC
+  # ("fc") or by service within an FC ("service"); see grain_cols(). The output tables at the
+  # end run each report_* at both grains. Organization-level statistics (S501, S511, reported
+  # in AC 82 9 90) have no grain.
+
   # S248 ** ** Meals Delivered (Number of)
   # Report for FC 72 5 82 10 (Meals Delivery Services) at combined or detailed (hot meal, frozen meal and side dish) level but not both.  Beverages are not counted.  Refer to Section 10.10.3 FC 72 5 82 10 for examples.
   #
@@ -48,13 +53,10 @@ generate_visit_and_service_counts <- function(processed_data,
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
 
-  calc_fc_248 <- calc_248 |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
-
-  calc_service_248 <- calc_248 |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+  report_248 <- function(grain) {
+    calc_248 |>
+      sum_by_grain(grain, sum(activity_count, na.rm = TRUE))
+  }
 
 
   # S265 ** ** Service Provider Interactions with Time Intervals ----
@@ -92,13 +94,10 @@ generate_visit_and_service_counts <- function(processed_data,
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
 
-  calc_fc_265 <- calc_265 |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count * activity_worker_count, na.rm = TRUE))
-
-  calc_service_265 <- calc_265 |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count * activity_worker_count, na.rm = TRUE))
+  report_265 <- function(grain) {
+    calc_265 |>
+      sum_by_grain(grain, sum(activity_count * activity_worker_count, na.rm = TRUE))
+  }
 
 
   # S266 ** ** Service Provider Group Interactions with Time Intervals ----
@@ -126,15 +125,11 @@ generate_visit_and_service_counts <- function(processed_data,
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
 
-  calc_fc_266 <- calc_266 |>
-    dplyr::distinct(date, funder_service_code, activity_group_id, funder_statistical_account_code, activity_worker_count) |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_worker_count, na.rm = TRUE))
-
-  calc_service_266 <- calc_266 |>
-    dplyr::distinct(date, funder_service_code, service_name, activity_group_id, funder_statistical_account_code, activity_worker_count) |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_worker_count, na.rm = TRUE))
+  report_266 <- function(grain) {
+    calc_266 |>
+      dplyr::distinct(dplyr::pick(dplyr::all_of(c("date", grain_cols(grain), "activity_group_id", "funder_statistical_account_code", "activity_worker_count")))) |>
+      sum_by_grain(grain, sum(activity_worker_count, na.rm = TRUE))
+  }
 
 
   # S401 4* *0 Resident Admissions (to the Functional Centre) ----
@@ -148,23 +143,16 @@ generate_visit_and_service_counts <- function(processed_data,
     filter_eligible("401") |>
     dplyr::filter(service_status == "Active")
 
-  calc_fc_401 <- calc_401 |>
-    merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "funder_service_code") |>
-    dplyr::mutate(digits_1_3 = "401",
-                  digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = participant_funder_age_group_code) |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = merged_start_date)  |>
-    dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
-
-  calc_service_401 <- calc_401 |>
-    merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "service_name") |>
-    dplyr::mutate(digits_1_3 = "401",
-                  digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = participant_funder_age_group_code) |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = merged_start_date)  |>
-    dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
+  report_401 <- function(grain) {
+    calc_401 |>
+      merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = grain) |>
+      dplyr::mutate(digits_1_3 = "401",
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = participant_funder_age_group_code) |>
+      assemble_statistical_account() |>
+      dplyr::rename(date = merged_start_date) |>
+      count_by_grain(grain)
+  }
 
 
   # S407 ** 20 Days Waited for Service Initiation ----
@@ -201,27 +189,17 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(service_status == "On Waitlist" & wait_outcome %in% "Active" &
                     service_status_start_date < first_active_date)
 
-  calc_fc_407 <- calc_407 |>
-    earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "funder_service_code", report_on = service_start_date) |>
-    dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
-    dplyr::mutate(digits_1_3 = "407",
-                  digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = "20") |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = merged_report_date) |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(days_waited, na.rm = TRUE))
-
-  calc_service_407 <- calc_407 |>
-    earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "service_name", report_on = service_start_date) |>
-    dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
-    dplyr::mutate(digits_1_3 = "407",
-                  digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = "20") |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = merged_report_date) |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(days_waited, na.rm = TRUE))
+  report_407 <- function(grain) {
+    calc_407 |>
+      earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = grain, report_on = service_start_date) |>
+      dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
+      dplyr::mutate(digits_1_3 = "407",
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = "20") |>
+      assemble_statistical_account() |>
+      dplyr::rename(date = merged_report_date) |>
+      sum_by_grain(grain, sum(days_waited, na.rm = TRUE))
+  }
 
 
   # S407 99 10 Days Waited for Assessment ----
@@ -244,27 +222,17 @@ generate_visit_and_service_counts <- function(processed_data,
                   service_decision_date <= report_date) |>
     dplyr::mutate(service_status_end_date = service_decision_date)
 
-  calc_fc_407_99 <- calc_407_99 |>
-    earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "funder_service_code") |>
-    dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
-    dplyr::mutate(digits_1_3 = "407",
-                  digits_4_5 = "99",
-                  digits_6_7 = "10") |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = merged_end_date) |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(days_waited, na.rm = TRUE))
-
-  calc_service_407_99 <- calc_407_99 |>
-    earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "service_name") |>
-    dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
-    dplyr::mutate(digits_1_3 = "407",
-                  digits_4_5 = "99",
-                  digits_6_7 = "10") |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = merged_end_date) |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(days_waited, na.rm = TRUE))
+  report_407_99 <- function(grain) {
+    calc_407_99 |>
+      earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = grain) |>
+      dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
+      dplyr::mutate(digits_1_3 = "407",
+                    digits_4_5 = "99",
+                    digits_6_7 = "10") |>
+      assemble_statistical_account() |>
+      dplyr::rename(date = merged_end_date) |>
+      sum_by_grain(grain, sum(days_waited, na.rm = TRUE))
+  }
 
 
   # S410 4* *0 Resident Discharges (from the Functional Centre) ----
@@ -305,59 +273,38 @@ generate_visit_and_service_counts <- function(processed_data,
   calc_410_513_css <- fc_involvement |>
     dplyr::filter(get_sr_code(funder_service_code) == "80")
 
-  calc_fc_410_513_css <- calc_410_513_css |>
-    merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = "funder_service_code") |>
-    dplyr::filter(merged_end_date <= report_date, ever_active) |>
+  report_410_513_css <- function(grain) {
+    calc_410_513_css |>
+      merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = grain) |>
+      dplyr::filter(merged_end_date <= report_date, ever_active) |>
 
-    # reason from the enrollment discharged last
-    dplyr::mutate(service_status_reason_code = stringr::str_sub(last_service_status_reason, 1, 2),
-           service_status_reason_code = dplyr::if_else(stringr::str_detect(service_status_reason_code, "^\\d\\d$"), service_status_reason_code, "90", missing = "90")) |>
-    dplyr::mutate(digits_1_3 = dplyr::if_else(funder_service_code %in% css_residential_fcs, "410", "513"),
-                  digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = dplyr::if_else(funder_service_code %in% css_residential_fcs, participant_funder_age_group_code, service_status_reason_code)) |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = merged_end_date) |>
-    dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
-
-
-  calc_service_410_513_css <- calc_410_513_css |>
-    merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = "service_name") |>
-    dplyr::filter(merged_end_date <= report_date, ever_active) |>
-
-    # reason from the enrollment discharged last
-    dplyr::mutate(service_status_reason_code = stringr::str_sub(last_service_status_reason, 1, 2),
-           service_status_reason_code = dplyr::if_else(stringr::str_detect(service_status_reason_code, "^\\d\\d$"), service_status_reason_code, "90", missing = "90")) |>
-    dplyr::mutate(digits_1_3 = dplyr::if_else(funder_service_code %in% css_residential_fcs, "410", "513"),
-                  digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = dplyr::if_else(funder_service_code %in% css_residential_fcs, participant_funder_age_group_code, service_status_reason_code)) |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = merged_end_date) |>
-    dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
+      # reason from the enrollment discharged last
+      dplyr::mutate(service_status_reason_code = stringr::str_sub(last_service_status_reason, 1, 2),
+                    service_status_reason_code = dplyr::if_else(stringr::str_detect(service_status_reason_code, "^\\d\\d$"), service_status_reason_code, "90", missing = "90")) |>
+      dplyr::mutate(digits_1_3 = dplyr::if_else(funder_service_code %in% css_residential_fcs, "410", "513"),
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = dplyr::if_else(funder_service_code %in% css_residential_fcs, participant_funder_age_group_code, service_status_reason_code)) |>
+      assemble_statistical_account() |>
+      dplyr::rename(date = merged_end_date) |>
+      count_by_grain(grain)
+  }
 
 
   ## CMHA version without discharge reason
   calc_410_513_cmha <- fc_involvement |>
     dplyr::filter(get_sr_code(funder_service_code) != "80")
 
-  calc_fc_410_513_cmha <- calc_410_513_cmha |>
-    merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = "funder_service_code") |>
-    dplyr::filter(merged_end_date <= report_date, ever_active) |>
-    dplyr::mutate(digits_1_3 = dplyr::if_else(get_sr_code(funder_service_code) == "45", "410", "513"),
-                  digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = dplyr::if_else(get_sr_code(funder_service_code) == "45", participant_funder_age_group_code, "90")) |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = merged_end_date) |>
-    dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
-
-  calc_service_410_513_cmha <- calc_410_513_cmha |>
-    merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = "service_name") |>
-    dplyr::filter(merged_end_date <= report_date, ever_active) |>
-    dplyr::mutate(digits_1_3 = dplyr::if_else(get_sr_code(funder_service_code) == "45", "410", "513"),
-                  digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = dplyr::if_else(get_sr_code(funder_service_code) == "45", participant_funder_age_group_code, "90")) |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = merged_end_date) |>
-    dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
+  report_410_513_cmha <- function(grain) {
+    calc_410_513_cmha |>
+      merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = grain) |>
+      dplyr::filter(merged_end_date <= report_date, ever_active) |>
+      dplyr::mutate(digits_1_3 = dplyr::if_else(get_sr_code(funder_service_code) == "45", "410", "513"),
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = dplyr::if_else(get_sr_code(funder_service_code) == "45", participant_funder_age_group_code, "90")) |>
+      assemble_statistical_account() |>
+      dplyr::rename(date = merged_end_date) |>
+      count_by_grain(grain)
+  }
 
 
   # S450 ** * * Visit – Face to Face, In-House ----
@@ -408,21 +355,12 @@ generate_visit_and_service_counts <- function(processed_data,
                   digits_6_7 = paste0(digits_6, digits_7)) |>
     assemble_statistical_account()
 
-  calc_fc_450_451_cmha <- calc_450_451_cmha |>
-    dplyr::group_by(funder_service_code, participant_id, activity_date) |>
-    dplyr::arrange(funder_service_code, participant_id, activity_date, activity_type_priority) |>
-    dplyr::slice(1) |>
-    dplyr::ungroup() |>
-    dplyr::rename(date = activity_date) |>
-    dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
-
-  calc_service_450_451_cmha <- calc_450_451_cmha |>
-    dplyr::group_by(funder_service_code, service_name, participant_id, activity_date) |>
-    dplyr::arrange(funder_service_code, service_name, participant_id, activity_date, activity_type_priority) |>
-    dplyr::slice(1) |>
-    dplyr::ungroup() |>
-    dplyr::rename(date = activity_date) |>
-    dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
+  report_450_451_cmha <- function(grain) {
+    calc_450_451_cmha |>
+      dplyr::rename(date = activity_date) |>
+      one_per_person_per_day(grain) |>
+      count_by_grain(grain)
+  }
 
 
   calc_450_451_css <- mis_visits |>
@@ -448,13 +386,10 @@ generate_visit_and_service_counts <- function(processed_data,
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
 
-  calc_fc_450_451_css <- calc_450_451_css |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
-
-  calc_service_450_451_css <- calc_450_451_css |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+  report_450_451_css <- function(grain) {
+    calc_450_451_css |>
+      sum_by_grain(grain, sum(activity_count, na.rm = TRUE))
+  }
 
 
   # S452 60 00 Not Uniquely Identified Service Recipient Interactions ----
@@ -472,13 +407,10 @@ generate_visit_and_service_counts <- function(processed_data,
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
 
-  calc_fc_452_60_00 <- calc_452_60_00 |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
-
-  calc_service_452_60_00 <- calc_452_60_00 |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+  report_452_60_00 <- function(grain) {
+    calc_452_60_00 |>
+      sum_by_grain(grain, sum(activity_count, na.rm = TRUE))
+  }
 
 
   calc_452_65_00 <- mis_unregistered_interactions |>
@@ -491,13 +423,10 @@ generate_visit_and_service_counts <- function(processed_data,
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
 
-  calc_fc_452_65_00 <- calc_452_65_00 |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
-
-  calc_service_452_65_00 <- calc_452_65_00 |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+  report_452_65_00 <- function(grain) {
+    calc_452_65_00 |>
+      sum_by_grain(grain, sum(activity_count, na.rm = TRUE))
+  }
 
 
   # S454 ** ** Hours of Care / Hours of Service – In House ----
@@ -533,13 +462,10 @@ generate_visit_and_service_counts <- function(processed_data,
                     dplyr::if_else(activity_individual_group == "Group" & !is.na(activity_group_id), 1 / dplyr::n(), 1)) |>
     dplyr::ungroup()
 
-  calc_fc_454 <- calc_454 |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(hours, na.rm = TRUE))
-
-  calc_service_454 <- calc_454 |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(hours, na.rm = TRUE))
+  report_454 <- function(grain) {
+    calc_454 |>
+      sum_by_grain(grain, sum(hours, na.rm = TRUE))
+  }
 
   # S483 ** ** Attendance Days – Face to Face ----
   # S483 ** *1   Attendance Days – Face to Face in Person
@@ -598,19 +524,11 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::rename(date = activity_date)
 
 
-  calc_fc_483_484 <- calc_483_484 |>
-    dplyr::group_by(funder_service_code, participant_id, date) |>
-    dplyr::arrange(funder_service_code, participant_id, date, activity_type_priority) |>
-    dplyr::slice(1) |>
-    dplyr::ungroup() |>
-    dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
-
-  calc_service_483_484 <- calc_483_484 |>
-    dplyr::group_by(funder_service_code, service_name, participant_id, date) |>
-    dplyr::arrange(funder_service_code, service_name, participant_id, date, activity_type_priority) |>
-    dplyr::slice(1) |>
-    dplyr::ungroup() |>
-    dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
+  report_483_484 <- function(grain) {
+    calc_483_484 |>
+      one_per_person_per_day(grain) |>
+      count_by_grain(grain)
+  }
 
 
   # S489 ** *0 New Referral ----
@@ -628,23 +546,16 @@ generate_visit_and_service_counts <- function(processed_data,
     filter_eligible("489") |>
     dplyr::filter(service_status %in% c("Active", "On Waitlist"), !is.na(service_decision_date))
 
-  calc_fc_489 <- calc_489 |>
-    merge_overlaps(service_decision_date, service_status_end_date, report_date, merge_level = "funder_service_code") |>
-    dplyr::mutate(digits_1_3 = "489",
-                  digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = participant_funder_age_group_code) |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = merged_start_date) |>
-    dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
-
-  calc_service_489 <- calc_489 |>
-    merge_overlaps(service_decision_date, service_status_end_date, report_date, merge_level = "service_name") |>
-    dplyr::mutate(digits_1_3 = "489",
-                  digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = participant_funder_age_group_code) |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = merged_start_date) |>
-    dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
+  report_489 <- function(grain) {
+    calc_489 |>
+      merge_overlaps(service_decision_date, service_status_end_date, report_date, merge_level = grain) |>
+      dplyr::mutate(digits_1_3 = "489",
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = participant_funder_age_group_code) |>
+      assemble_statistical_account() |>
+      dplyr::rename(date = merged_start_date) |>
+      count_by_grain(grain)
+  }
 
 
 
@@ -667,13 +578,10 @@ generate_visit_and_service_counts <- function(processed_data,
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
 
-  calc_fc_491_60_10 <- calc_491_60_10 |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
-
-  calc_service_491_60_10 <- calc_491_60_10 |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+  report_491_60_10 <- function(grain) {
+    calc_491_60_10 |>
+      sum_by_grain(grain, sum(activity_count, na.rm = TRUE))
+  }
 
 
   calc_491_65_10 <- mis_unregistered_interactions |>
@@ -686,13 +594,10 @@ generate_visit_and_service_counts <- function(processed_data,
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
 
-  calc_fc_491_65_10 <- calc_491_65_10 |>
-    dplyr::group_by(date, funder_service_code, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
-
-  calc_service_491_65_10 <- calc_491_65_10 |>
-    dplyr::group_by(date, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::summarize(value = sum(activity_count, na.rm = TRUE))
+  report_491_65_10 <- function(grain) {
+    calc_491_65_10 |>
+      sum_by_grain(grain, sum(activity_count, na.rm = TRUE))
+  }
 
 
 
@@ -712,11 +617,9 @@ generate_visit_and_service_counts <- function(processed_data,
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
 
-  calc_fc_491 <- calc_491 |>
-    dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
-
-  calc_service_491 <- calc_491 |>
-    dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
+  report_491 <- function(grain) {
+    count_by_grain(calc_491, grain)
+  }
 
 
   # S492 00 *0 Group Sessions in Person (Number of Group Sessions) ----
@@ -755,15 +658,12 @@ generate_visit_and_service_counts <- function(processed_data,
                .default =                                            "492 00 10"   # time interval not reported
              ))
 
-  calc_fc_492 <- calc_492 |>
-    dplyr::distinct(activity_date, activity_group_id, funder_service_code, funder_statistical_account_code) |>
-    dplyr::rename(date = activity_date) |>
-    dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
-
-  calc_service_492 <- calc_492 |>
-    dplyr::distinct(activity_date, activity_group_id, funder_service_code, service_name, funder_statistical_account_code) |>
-    dplyr::rename(date = activity_date) |>
-    dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
+  report_492 <- function(grain) {
+    calc_492 |>
+      dplyr::rename(date = activity_date) |>
+      dplyr::distinct(dplyr::pick(dplyr::all_of(c("date", "activity_group_id", grain_cols(grain), "funder_statistical_account_code")))) |>
+      count_by_grain(grain)
+  }
 
 
   # S501 ** *0 Admissions to Community Services (to the organization) ----
@@ -826,32 +726,20 @@ generate_visit_and_service_counts <- function(processed_data,
       filter_eligible("506") |>
       dplyr::filter(service_status == "Active")
 
-    calc_fc_506 <- calc_506 |>
+    report_506 <- function(grain) {
+      calc_506 |>
+        # find first date within the FC or service (sum of service durations == 0)
+        dplyr::group_by(dplyr::pick(dplyr::all_of(c("date", "participant_id", "participant_funder_age_group_code", grain_cols(grain))))) |>
+        dplyr::summarize(service_status_duration = sum(service_status_duration)) |>
+        dplyr::ungroup() |>
+        dplyr::filter(service_status_duration == 0) |>
 
-      # find first date within functional centre (sum of service durations == 0)
-      dplyr::group_by(date, participant_id, participant_funder_age_group_code, funder_service_code) |>
-      dplyr::summarize(service_status_duration = sum(service_status_duration)) |>
-      dplyr::ungroup() |>
-      dplyr::filter(service_status_duration == 0) |>
-
-      dplyr::mutate(digits_1_3 = "506",
-                    digits_4_5 = get_sr_code(funder_service_code),
-                    digits_6_7 = participant_funder_age_group_code) |>
-      assemble_statistical_account() |>
-      dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
-
-    calc_service_506 <- calc_506 |>
-      # find first date within service (sum of service durations)
-      dplyr::group_by(date, participant_id, participant_funder_age_group_code, funder_service_code, service_name) |>
-      dplyr::summarize(service_status_duration = sum(service_status_duration)) |>
-      dplyr::ungroup() |>
-      dplyr::filter(service_status_duration == 0) |>
-
-      dplyr::mutate(digits_1_3 = "506",
-                    digits_4_5 = get_sr_code(funder_service_code),
-                    digits_6_7 = participant_funder_age_group_code) |>
-      assemble_statistical_account() |>
-      dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
+        dplyr::mutate(digits_1_3 = "506",
+                      digits_4_5 = get_sr_code(funder_service_code),
+                      digits_6_7 = participant_funder_age_group_code) |>
+        assemble_statistical_account() |>
+        count_by_grain(grain)
+    }
   }
 
   if(fc_506_version == "verB"){
@@ -860,25 +748,17 @@ generate_visit_and_service_counts <- function(processed_data,
       filter_eligible("506") |>
       dplyr::filter(service_status == "Active" & !is.na(service_first_direct_activity))
 
-    calc_fc_506 <- calc_506 |>
-      merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "funder_service_code") |>
-      dplyr::distinct(participant_id, participant_funder_age_group_code, service_first_direct_activity, funder_service_code) |>
-      dplyr::mutate(digits_1_3 = "506",
-                    digits_4_5 = get_sr_code(funder_service_code),
-                    digits_6_7 = participant_funder_age_group_code) |>
-      assemble_statistical_account() |>
-      dplyr::rename(date = service_first_direct_activity) |>
-      dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
-
-    calc_service_506 <- calc_506 |>
-      merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "service_name") |>
-      dplyr::distinct(participant_id, participant_funder_age_group_code, service_first_direct_activity, funder_service_code, service_name) |>
-      dplyr::mutate(digits_1_3 = "506",
-                    digits_4_5 = get_sr_code(funder_service_code),
-                    digits_6_7 = participant_funder_age_group_code) |>
-      assemble_statistical_account() |>
-      dplyr::rename(date = service_first_direct_activity) |>
-      dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
+    report_506 <- function(grain) {
+      calc_506 |>
+        merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = grain) |>
+        dplyr::distinct(dplyr::pick(dplyr::all_of(c("participant_id", "participant_funder_age_group_code", "service_first_direct_activity", grain_cols(grain))))) |>
+        dplyr::mutate(digits_1_3 = "506",
+                      digits_4_5 = get_sr_code(funder_service_code),
+                      digits_6_7 = participant_funder_age_group_code) |>
+        assemble_statistical_account() |>
+        dplyr::rename(date = service_first_direct_activity) |>
+        count_by_grain(grain)
+    }
   }
 
 
@@ -934,50 +814,48 @@ generate_visit_and_service_counts <- function(processed_data,
 
   rlog::log_info("Generating S512 statistic")
 
-  calc_fc_512 <- mis_visits |>
-    filter_eligible("512") |>
-    dplyr::filter(stringr::str_detect(activity_assessment, "Assessment Complete/Outcome")) |>
-    dplyr::mutate(digits_1_3 = "512",
-                  digits_4_5 = get_sr_code(funder_service_code),
-                  digits_6_7 = dplyr::case_when(stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Client Declined") ~ "11",
-                                         stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Admitted") ~ "12",
-                                         stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Adult Day") ~ "21",
-                                         stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Supportive Housing") ~ "22",
-                                         stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Enhanced Respite") ~ "23",
-                                         stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Other Organizations") ~ "29",
-                                         .default = "12")) |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = activity_date) |>
-    dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
-
-  calc_service_512 <- mis_visits |>
-    filter_eligible("512") |>
-    dplyr::filter(stringr::str_detect(activity_assessment, "Assessment Complete/Outcome")) |>
-    dplyr::mutate(digits_1_3 = "512",
-                         digits_4_5 = get_sr_code(funder_service_code),
-                         digits_6_7 = dplyr::case_when(stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Client Declined") ~ "11",
-                                                stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Admitted") ~ "12",
-                                                stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Adult Day") ~ "21",
-                                                stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Supportive Housing") ~ "22",
-                                                stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Enhanced Respite") ~ "23",
-                                                stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Other Organizations") ~ "29",
-                                                .default = "12")) |>
-    assemble_statistical_account() |>
-    dplyr::rename(date = activity_date) |>
-    dplyr::count(date, funder_service_code, service_name, funder_statistical_account_code, name = "value")
+  report_512 <- function(grain) {
+    mis_visits |>
+      filter_eligible("512") |>
+      dplyr::filter(stringr::str_detect(activity_assessment, "Assessment Complete/Outcome")) |>
+      dplyr::mutate(digits_1_3 = "512",
+                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_6_7 = dplyr::case_when(stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Client Declined") ~ "11",
+                                           stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Admitted") ~ "12",
+                                           stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Adult Day") ~ "21",
+                                           stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Supportive Housing") ~ "22",
+                                           stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Enhanced Respite") ~ "23",
+                                           stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Other Organizations") ~ "29",
+                                           .default = "12")) |>
+      assemble_statistical_account() |>
+      dplyr::rename(date = activity_date) |>
+      count_by_grain(grain)
+  }
 
 
   # Write mis_visit_and_service_counts_by_fc to file ----
 
   rlog::log_info("Writing cumulative-type statistics files")
 
-  mis_visit_and_service_counts_by_fc <- dplyr::bind_rows(calc_fc_248, calc_fc_265, calc_fc_266, calc_fc_401, calc_fc_407, calc_fc_407_99, calc_fc_410_513_cmha, calc_fc_410_513_css, calc_fc_450_451_cmha, calc_fc_450_451_css, calc_fc_452_60_00, calc_fc_452_65_00, calc_fc_454, calc_fc_483_484, calc_fc_489, calc_fc_491_60_10, calc_fc_491_65_10, calc_fc_491, calc_fc_492, calc_org_501, calc_fc_506, calc_fc_511_cmha, calc_fc_511_css, calc_fc_512) |>
+  mis_visit_and_service_counts_by_fc <- dplyr::bind_rows(report_248("fc"), report_265("fc"), report_266("fc"), report_401("fc"),
+                                                         report_407("fc"), report_407_99("fc"), report_410_513_cmha("fc"), report_410_513_css("fc"),
+                                                         report_450_451_cmha("fc"), report_450_451_css("fc"), report_452_60_00("fc"), report_452_65_00("fc"),
+                                                         report_454("fc"), report_483_484("fc"), report_489("fc"), report_491_60_10("fc"),
+                                                         report_491_65_10("fc"), report_491("fc"), report_492("fc"), calc_org_501,
+                                                         report_506("fc"), calc_fc_511_cmha, calc_fc_511_css, report_512("fc")) |>
     dplyr::mutate(funder_key = paste0(funder_service_code, "_", funder_statistical_account_code))
 
   readr::write_csv(mis_visit_and_service_counts_by_fc, paste0(data_folder, "/processed/mis_visit_and_service_counts_by_fc.csv"), na = "")
 
 
-  mis_visit_and_service_counts_by_service <- dplyr::bind_rows(calc_service_248, calc_service_265, calc_service_266, calc_service_401,  calc_service_407, calc_service_407_99, calc_service_410_513_cmha, calc_service_410_513_css, calc_service_450_451_cmha, calc_service_450_451_css, calc_service_452_60_00, calc_service_452_65_00, calc_service_454, calc_service_483_484, calc_service_489, calc_service_491_60_10, calc_service_491_65_10, calc_service_491, calc_service_492, calc_service_506, calc_service_512) |>
+  mis_visit_and_service_counts_by_service <- dplyr::bind_rows(report_248("service"), report_265("service"), report_266("service"),
+                                                              report_401("service"), report_407("service"), report_407_99("service"),
+                                                              report_410_513_cmha("service"), report_410_513_css("service"),
+                                                              report_450_451_cmha("service"), report_450_451_css("service"),
+                                                              report_452_60_00("service"), report_452_65_00("service"), report_454("service"),
+                                                              report_483_484("service"), report_489("service"), report_491_60_10("service"),
+                                                              report_491_65_10("service"), report_491("service"), report_492("service"),
+                                                              report_506("service"), report_512("service")) |>
     dplyr::mutate(funder_service_key = paste0(funder_service_code, "_", service_name, "_", funder_statistical_account_code))
 
   readr::write_csv(mis_visit_and_service_counts_by_service, paste0(data_folder, "/processed/mis_visit_and_service_counts_by_service.csv"), na = "")
