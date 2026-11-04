@@ -14,6 +14,7 @@ generate_visit_and_service_counts <- function(processed_data,
   rlog::log_info(glue::glue("Applying fc_450_version = '{fc_450_version}', fc_506_version = '{fc_506_version}', and ir_version = '{ir_version}' to visit and service counts"))
 
   data_folder <- processed_data$data_folder
+  report_date <- processed_data$report_date
   mis_service_history <- processed_data$mis_service_history
   mis_visits <- processed_data$mis_visits
   mis_unregistered_interactions <- processed_data$mis_unregistered_interactions
@@ -154,7 +155,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(service_status == "Active")
 
   calc_fc_401 <- calc_401 |>
-    merge_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
+    merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "funder_service_code") |>
     dplyr::mutate(digits_1_3 = "401",
                   digits_4_5 = get_sr_code(funder_service_code),
                   digits_6_7 = participant_funder_age_group_code) |>
@@ -163,7 +164,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
 
   calc_service_401 <- calc_401 |>
-    merge_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
+    merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "service_name") |>
     dplyr::mutate(digits_1_3 = "401",
                   digits_4_5 = get_sr_code(funder_service_code),
                   digits_6_7 = participant_funder_age_group_code) |>
@@ -207,7 +208,7 @@ generate_visit_and_service_counts <- function(processed_data,
                     service_status_start_date < first_active_date)
 
   calc_fc_407 <- calc_407 |>
-    earliest_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code", report_date = service_start_date) |>
+    earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "funder_service_code", report_on = service_start_date) |>
     dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
     dplyr::mutate(digits_1_3 = "407",
                   digits_4_5 = get_sr_code(funder_service_code),
@@ -218,7 +219,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::summarize(value = sum(days_waited, na.rm = TRUE))
 
   calc_service_407 <- calc_407 |>
-    earliest_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "service_name", report_date = service_start_date) |>
+    earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "service_name", report_on = service_start_date) |>
     dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
     dplyr::mutate(digits_1_3 = "407",
                   digits_4_5 = get_sr_code(funder_service_code),
@@ -246,11 +247,11 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(service_status == "Waiting for Assessment",
                   !is.na(service_decision_date),
                   service_decision_date >= service_status_start_date,
-                  service_decision_date <= lubridate::today()) |>
+                  service_decision_date <= report_date) |>
     dplyr::mutate(service_status_end_date = service_decision_date)
 
   calc_fc_407_99 <- calc_407_99 |>
-    earliest_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
+    earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "funder_service_code") |>
     dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
     dplyr::mutate(digits_1_3 = "407",
                   digits_4_5 = "99",
@@ -261,7 +262,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::summarize(value = sum(days_waited, na.rm = TRUE))
 
   calc_service_407_99 <- calc_407_99 |>
-    earliest_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
+    earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "service_name") |>
     dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
     dplyr::mutate(digits_1_3 = "407",
                   digits_4_5 = "99",
@@ -293,7 +294,10 @@ generate_visit_and_service_counts <- function(processed_data,
 
   # Periods in each FC from the eligibility decision to discharge (same approach as S501/S511):
   # overlapping enrollments in the same FC/service are merged, and a discharge is counted only when
-  # every enrollment in the period has ended (open enrollments run to tomorrow via the prefilled end date).
+  # every enrollment in the period has ended (open enrollments run to the day after report_date).
+  # A discharge is counted only if service started in the period, so S513 pairs with S506 and S410
+  # with S401; a client who leaves the waitlist without service is not discharged (OHRS Ch. 7,
+  # 7.7.4 and 7.7.8 step 12; Ch. 10, 10.9.4.4 example 2).
   # Each enrollment's discharge reason (from its Inactive row) is carried onto its other rows.
   fc_involvement <- mis_service_history |>
     filter_eligible("410|513") |>
@@ -308,8 +312,8 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(get_sr_code(funder_service_code) == "80")
 
   calc_fc_410_513_css <- calc_410_513_css |>
-    merge_overlaps(involvement_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
-    dplyr::filter(merged_end_date <= lubridate::today()) |>
+    merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = "funder_service_code") |>
+    dplyr::filter(merged_end_date <= report_date, ever_active) |>
 
     # reason from the enrollment discharged last
     dplyr::mutate(service_status_reason_code = stringr::str_sub(last_service_status_reason, 1, 2),
@@ -323,8 +327,8 @@ generate_visit_and_service_counts <- function(processed_data,
 
 
   calc_service_410_513_css <- calc_410_513_css |>
-    merge_overlaps(involvement_start_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
-    dplyr::filter(merged_end_date <= lubridate::today()) |>
+    merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = "service_name") |>
+    dplyr::filter(merged_end_date <= report_date, ever_active) |>
 
     # reason from the enrollment discharged last
     dplyr::mutate(service_status_reason_code = stringr::str_sub(last_service_status_reason, 1, 2),
@@ -342,8 +346,8 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(get_sr_code(funder_service_code) != "80")
 
   calc_fc_410_513_cmha <- calc_410_513_cmha |>
-    merge_overlaps(involvement_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
-    dplyr::filter(merged_end_date <= lubridate::today()) |>
+    merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = "funder_service_code") |>
+    dplyr::filter(merged_end_date <= report_date, ever_active) |>
     dplyr::mutate(digits_1_3 = dplyr::if_else(get_sr_code(funder_service_code) == "45", "410", "513"),
                   digits_4_5 = get_sr_code(funder_service_code),
                   digits_6_7 = dplyr::if_else(get_sr_code(funder_service_code) == "45", participant_funder_age_group_code, "90")) |>
@@ -352,8 +356,8 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
 
   calc_service_410_513_cmha <- calc_410_513_cmha |>
-    merge_overlaps(involvement_start_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
-    dplyr::filter(merged_end_date <= lubridate::today()) |>
+    merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = "service_name") |>
+    dplyr::filter(merged_end_date <= report_date, ever_active) |>
     dplyr::mutate(digits_1_3 = dplyr::if_else(get_sr_code(funder_service_code) == "45", "410", "513"),
                   digits_4_5 = get_sr_code(funder_service_code),
                   digits_6_7 = dplyr::if_else(get_sr_code(funder_service_code) == "45", participant_funder_age_group_code, "90")) |>
@@ -631,7 +635,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(service_status %in% c("Active", "On Waitlist"), !is.na(service_decision_date))
 
   calc_fc_489 <- calc_489 |>
-    merge_overlaps(service_decision_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
+    merge_overlaps(service_decision_date, service_status_end_date, report_date, merge_level = "funder_service_code") |>
     dplyr::mutate(digits_1_3 = "489",
                   digits_4_5 = get_sr_code(funder_service_code),
                   digits_6_7 = participant_funder_age_group_code) |>
@@ -640,7 +644,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
 
   calc_service_489 <- calc_489 |>
-    merge_overlaps(service_decision_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
+    merge_overlaps(service_decision_date, service_status_end_date, report_date, merge_level = "service_name") |>
     dplyr::mutate(digits_1_3 = "489",
                   digits_4_5 = get_sr_code(funder_service_code),
                   digits_6_7 = participant_funder_age_group_code) |>
@@ -790,7 +794,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::ungroup() |>
     dplyr::filter(service_status %in% c("On Waitlist", "On Hold", "Active")) |>
     dplyr::mutate(involvement_start_date = dplyr::coalesce(service_decision_date, service_status_start_date)) |>
-    merge_overlaps(involvement_start_date, service_status_end_date, lubridate::today(), merge_level = "organization")
+    merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = "organization")
 
   calc_org_501 <- org_involvement |>
 
@@ -863,7 +867,7 @@ generate_visit_and_service_counts <- function(processed_data,
       dplyr::filter(service_status == "Active" & !is.na(service_first_direct_activity))
 
     calc_fc_506 <- calc_506 |>
-      merge_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "funder_service_code") |>
+      merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "funder_service_code") |>
       dplyr::distinct(participant_id, participant_funder_age_group_code, service_first_direct_activity, funder_service_code) |>
       dplyr::mutate(digits_1_3 = "506",
                     digits_4_5 = get_sr_code(funder_service_code),
@@ -873,7 +877,7 @@ generate_visit_and_service_counts <- function(processed_data,
       dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
 
     calc_service_506 <- calc_506 |>
-      merge_overlaps(service_status_start_date, service_status_end_date, lubridate::today(), merge_level = "service_name") |>
+      merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = "service_name") |>
       dplyr::distinct(participant_id, participant_funder_age_group_code, service_first_direct_activity, funder_service_code, service_name) |>
       dplyr::mutate(digits_1_3 = "506",
                     digits_4_5 = get_sr_code(funder_service_code),
@@ -895,7 +899,7 @@ generate_visit_and_service_counts <- function(processed_data,
   # (period end on or before today; open enrollments run to tomorrow). Dated at the last
   # discharge, with the reason from the enrollment that was discharged last.
   calc_511 <- org_involvement |>
-    dplyr::filter(merged_end_date <= lubridate::today()) |>
+    dplyr::filter(merged_end_date <= report_date) |>
     dplyr::mutate(service_status_reason_code = stringr::str_sub(last_service_status_reason, 1, 2),
                   funder_service_code = "82 9 90",
                   digits_1_3 = "511",
@@ -984,4 +988,6 @@ generate_visit_and_service_counts <- function(processed_data,
 
   readr::write_csv(mis_visit_and_service_counts_by_service, paste0(data_folder, "/processed/mis_visit_and_service_counts_by_service.csv"), na = "")
 
+  invisible(list(mis_visit_and_service_counts_by_fc = mis_visit_and_service_counts_by_fc,
+                 mis_visit_and_service_counts_by_service = mis_visit_and_service_counts_by_service))
 }

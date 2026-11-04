@@ -732,4 +732,6 @@ generate_census_counts <- function(processed_data,
 
   readr::write_csv(mis_census_counts_by_service, paste0(data_folder, "/processed/mis_census_counts_by_service.csv"), na = "")
 
+  invisible(list(mis_census_counts_by_fc = mis_census_counts_by_fc,
+                 mis_census_counts_by_service = mis_census_counts_by_service))
 }

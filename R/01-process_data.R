@@ -6,7 +6,7 @@
 #' @export
 #'
 #' @examples
-process_data <- function(data_folder, debug){
+process_data <- function(data_folder, debug = FALSE, report_date = lubridate::today()){
 
   # Read data ----
 
@@ -16,6 +16,21 @@ process_data <- function(data_folder, debug){
   services <- readr::read_rds(paste0(data_folder, "/interim/rds/services.rds"))
   activities <- readr::read_rds(paste0(data_folder, "/interim/rds/activities.rds"))
   functional_centre_mapping <- readr::read_rds(paste0(data_folder, "/interim/rds/functional_centre_mapping.rds"))
+
+  # Nothing should be dated after report_date; drop anything that is, so a run reflects
+  # the data as at report_date. Statuses that start later are removed, and decision and
+  # first-service dates that fall later are treated as not yet known.
+  services <- services |>
+    dplyr::filter(service_status_start_date <= report_date) |>
+    dplyr::mutate(service_decision_date = dplyr::if_else(service_decision_date > report_date, lubridate::NA_Date_, service_decision_date))
+
+  if("service_first_direct_activity" %in% colnames(services)){
+    services <- services |>
+      dplyr::mutate(service_first_direct_activity = dplyr::if_else(service_first_direct_activity > report_date, lubridate::NA_Date_, service_first_direct_activity))
+  }
+
+  activities <- activities |>
+    dplyr::filter(activity_date <= report_date)
 
   if(!("participant_ohrs_special_needs" %in% colnames(participants))){
     participants <- participants |>
@@ -85,7 +100,7 @@ process_data <- function(data_folder, debug){
     dplyr::arrange(service_enrollment_id, service_status_start_date, service_status) |>
     dplyr::mutate(service_status_end_date = dplyr::lead(service_status_start_date)) |>
     dplyr::ungroup() |>
-    dplyr::mutate(service_status_end_date = dplyr::coalesce(service_status_end_date, lubridate::today() + lubridate::days(1)))
+    dplyr::mutate(service_status_end_date = dplyr::coalesce(service_status_end_date, report_date + lubridate::days(1)))
 
   if(!("participant_preferred_language" %in% colnames(mis_service_history))){
     mis_service_history <- mis_service_history |>
@@ -142,7 +157,7 @@ process_data <- function(data_folder, debug){
     dplyr::filter(service_status != "Inactive") |>
     dplyr::filter(is.na(service_status_end_date) | service_status_end_date >= dashboard_start_date) |>
     dplyr::mutate(start_date = dplyr::if_else(service_status_start_date < dashboard_start_date, dashboard_start_date, service_status_start_date),
-           end_date = dplyr::if_else(service_status_end_date > lubridate::today() | is.na(service_status_end_date), lubridate::today() + lubridate::days(1), service_status_end_date),
+           end_date = dplyr::if_else(service_status_end_date > report_date | is.na(service_status_end_date), report_date + lubridate::days(1), service_status_end_date),
 
            # for active period, make end_date day before discharge date except when start and end are same day
            end_date = dplyr::if_else(service_status == "Active", end_date - lubridate::days(1), end_date),
@@ -162,6 +177,7 @@ process_data <- function(data_folder, debug){
     fast_age_calculation(participant_date_of_birth, date)
 
   processed_data <- list(data_folder = data_folder,
+                         report_date = report_date,
                          mis_service_history = mis_service_history,
                          mis_visits = mis_visits,
                          mis_unregistered_interactions = mis_unregistered_interactions,

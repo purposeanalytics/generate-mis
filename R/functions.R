@@ -232,7 +232,9 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
               # reason on the row that ended last (e.g. the final discharge in the period)
               last_service_status_reason = service_status_reason[which.max(end_date)],
               service_first_direct_activity = min(service_first_direct_activity),
-              service_enrollment_id = min(service_enrollment_id)) |>
+              service_enrollment_id = min(service_enrollment_id),
+              # whether service started at any point in the merged period
+              ever_active = any(service_status == "Active")) |>
     dplyr::ungroup()
 
 }
@@ -294,14 +296,14 @@ intersect_overlaps <- function(df, dimension_start, dimension_end, report_end, m
 #' @export
 #'
 #' @examples
-earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, merge_level, report_date) {
+earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, merge_level, report_on) {
 
   # optional date to report the merged period on (e.g. service start date for S407);
   # returned as merged_report_date (latest in the period), NA if not supplied
-  if (missing(report_date)) {
+  if (missing(report_on)) {
     df <- dplyr::mutate(df, .report_date = lubridate::NA_Date_)
   } else {
-    df <- dplyr::mutate(df, .report_date = {{report_date}})
+    df <- dplyr::mutate(df, .report_date = {{report_on}})
   }
 
   if (merge_level == "service_name") {

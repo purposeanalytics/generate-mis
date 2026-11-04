@@ -29,7 +29,8 @@ generate_tables(
   fc_450_version = "verA"
   fc_455_version = "verA", 
   fc_506_version = "verA",
-  ir_version = "verCMHA"
+  ir_version = "verCMHA",
+  report_date = Sys.Date()
 )
 
 ```
@@ -67,3 +68,15 @@ This can take one of two conditions which assigns either CMHA or CSS statistical
 
 * `verCMHA` which sets the "Not Uniquely Identified SR Interactions" statistical code to 452 65 00
 * `verCSS` which sets the "Not Uniquely Identified SR Interactions" statistical code to 452 60 00
+
+**report_date**
+
+The date the run is "as at". It defaults to today. Records dated after it are ignored: service statuses that start later and activities on later dates are dropped, and decision or first-service dates that fall later are treated as not yet known. Statuses that are still open are treated as running to the day after this date.
+
+## Tests
+
+The tests in `tests/testthat` run the full pipeline on a small set of made-up clients, each set up to check one counting rule. Run them with:
+
+``` r
+devtools::test()
+```
