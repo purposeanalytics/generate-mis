@@ -28,4 +28,8 @@ test_that("S501 and S511 pair up at the organization level", {
   # P9 has enrollments in two CMH&A FCs: one admission, still open
   # (P2 is the other Apr 1 admission)
   expect_equal(value_on(fc, "82 9 90", "501 25 40", "2025-04-01"), 2)
+  # P4 was accepted onto the waitlist and withdrew before service started. S501 and
+  # S511 follow acceptance, not service, so both count (unlike S506 and S513)
+  expect_equal(value_on(fc, "82 9 90", "501 25 40", "2025-06-01"), 1)
+  expect_equal(value_on(fc, "82 9 90", "511 25 90", "2025-07-01"), 1)
 })
