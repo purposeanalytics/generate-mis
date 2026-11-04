@@ -133,3 +133,14 @@ The tests in `tests/testthat` run the full pipeline on a small set of made-up cl
 ``` r
 devtools::test()
 ```
+
+### Checking that a change leaves the output unchanged
+
+`dev/compare-outputs.R` builds a larger random dataset of made-up people across 11 functional centres, with two services each. It runs every combination of the version arguments, then compares the output tables with a saved copy. Use it when restructuring code, where the numbers shouldn't move. It takes a few minutes. Run it from the repo root:
+
+``` sh
+Rscript dev/compare-outputs.R save      # before the change
+Rscript dev/compare-outputs.R compare   # after the change
+```
+
+`compare` names each statistic that differs. The baseline is saved to `dev/baseline.rds`, which isn't committed.
