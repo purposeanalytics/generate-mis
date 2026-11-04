@@ -139,18 +139,18 @@ generate_visit_and_service_counts <- function(processed_data,
 
   rlog::log_info("Generating S401 statistic")
 
+  # One admission per episode, on the day service first started (see fc_episodes())
   calc_401 <- mis_service_history |>
-    filter_eligible("401") |>
-    dplyr::filter(service_status == "Active")
+    filter_eligible("401")
 
   report_401 <- function(grain) {
-    calc_401 |>
-      merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = grain) |>
+    fc_episodes(calc_401, grain, report_date) |>
+      dplyr::filter(!is.na(first_active_date)) |>
       dplyr::mutate(digits_1_3 = "401",
                     digits_4_5 = get_sr_code(funder_service_code),
                     digits_6_7 = participant_funder_age_group_code) |>
       assemble_statistical_account() |>
-      dplyr::rename(date = merged_start_date) |>
+      dplyr::rename(date = first_active_date) |>
       count_by_grain(grain)
   }
 
@@ -167,27 +167,18 @@ generate_visit_and_service_counts <- function(processed_data,
 
   rlog::log_info("Generating S407 statistic")
 
+  # Days On Waitlist in each episode where service started, reported on the day it started
+  # (service starts at enrollment into the FC, Ch. 7 s7.7.8, step 8). Days stop when On
+  # Waitlist ends, so On Hold days aren't counted. Waits that ended without service
+  # (withdrawal, discharge) and people still waiting aren't counted. A return to the waitlist
+  # after service started is treated as On Hold (see number_episodes()), so only the wait
+  # before first service in each episode counts.
   calc_407 <- mis_service_history |>
     filter_eligible("407") |>
-    # only count waits that ended because service started; excludes people still waiting
-    # and waits that ended in withdrawal/discharge. Looks past any On Hold periods
-    # (e.g. waitlist -> on hold -> active) to the status that resolved the wait.
-    dplyr::group_by(service_enrollment_id) |>
-    dplyr::arrange(service_status_start_date, service_status, .by_group = TRUE) |>
-    dplyr::mutate(waiting = service_status %in% c("On Waitlist", "On Hold"),
-                  wait_outcome = dplyr::if_else(waiting, NA_character_, as.character(service_status)),
-                  service_start_date = dplyr::if_else(waiting, lubridate::NA_Date_, service_status_start_date),
-                  # service starts at enrollment into the FC (Ch. 7 s7.7.8, step 8)
-                  first_active_date = suppressWarnings(min(service_status_start_date[service_status == "Active"]))) |>
-    tidyr::fill(wait_outcome, service_start_date, .direction = "up") |>
+    dplyr::group_by(service_enrollment_id, episode) |>
+    dplyr::mutate(service_start_date = first_date(service_status_start_date[service_status == "Active"])) |>
     dplyr::ungroup() |>
-    # days waited stop when On Waitlist ends (whether the next status is On Hold or Active;
-    # service_status_end_date is already the start of the next status), but are reported
-    # on the date service started (OHRS: reported after the service has started).
-    # Only the wait before first service counts; a return to the waitlist after service
-    # started is a data quality issue, not a wait for service initiation.
-    dplyr::filter(service_status == "On Waitlist" & wait_outcome %in% "Active" &
-                    service_status_start_date < first_active_date)
+    dplyr::filter(service_status == "On Waitlist", service_status_start_date < service_start_date)
 
   report_407 <- function(grain) {
     calc_407 |>
@@ -254,28 +245,18 @@ generate_visit_and_service_counts <- function(processed_data,
   css_residential_fcs <- c("72 5 82 40", "72 5 82 45", "72 5 83 45",
                            "73 5 82 40", "73 5 82 45", "73 5 83 45")
 
-  # Periods in each FC from the eligibility decision to discharge (same approach as S501/S511):
-  # overlapping enrollments in the same FC/service are merged, and a discharge is counted only when
-  # every enrollment in the period has ended (open enrollments run to the day after report_date).
-  # A discharge is counted only if service started in the period, so S513 pairs with S506 and S410
-  # with S401; a client who leaves the waitlist without service is not discharged (OHRS Ch. 7,
-  # 7.7.4 and 7.7.8 step 12; Ch. 10, 10.9.4.4 example 2).
-  # Each enrollment's discharge reason (from its Inactive row) is carried onto its other rows.
+  # Counted when an FC episode ends (see fc_episodes()). A discharge is counted only if service
+  # started in the episode, so S513 pairs with S506 and S410 with S401; a client who leaves the
+  # waitlist without service is not discharged (OHRS Ch. 7, 7.7.4 and 7.7.8 step 12).
   fc_involvement <- mis_service_history |>
-    filter_eligible("410|513") |>
-    dplyr::group_by(service_enrollment_id) |>
-    dplyr::mutate(service_status_reason = dplyr::last(service_status_reason[service_status == "Inactive"])) |>
-    dplyr::ungroup() |>
-    dplyr::filter(service_status %in% c("On Waitlist", "On Hold", "Active")) |>
-    dplyr::mutate(involvement_start_date = dplyr::coalesce(service_decision_date, service_status_start_date))
+    filter_eligible("410|513")
 
   ## CSS version with discharge reason
   calc_410_513_css <- fc_involvement |>
     dplyr::filter(get_sr_code(funder_service_code) == "80")
 
   report_410_513_css <- function(grain) {
-    calc_410_513_css |>
-      merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = grain) |>
+    fc_episodes(calc_410_513_css, grain, report_date) |>
       dplyr::filter(merged_end_date <= report_date, ever_active) |>
 
       # reason from the enrollment discharged last
@@ -295,8 +276,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(get_sr_code(funder_service_code) != "80")
 
   report_410_513_cmha <- function(grain) {
-    calc_410_513_cmha |>
-      merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = grain) |>
+    fc_episodes(calc_410_513_cmha, grain, report_date) |>
       dplyr::filter(merged_end_date <= report_date, ever_active) |>
       dplyr::mutate(digits_1_3 = dplyr::if_else(get_sr_code(funder_service_code) == "45", "410", "513"),
                     digits_4_5 = get_sr_code(funder_service_code),
@@ -536,19 +516,19 @@ generate_visit_and_service_counts <- function(processed_data,
   # The number of service recipients accepted to receive service in a functional centre during the reporting period.  Includes all SRs who are eligible to receive service regardless of whether they had to wait or not for service to commence. There may be multiple referrals to various service functional centres as one SR may be referred to a number of functional centres. If a client has received service and later discharged from a functional centre and then re-admitted again to the same FC within the same reporting period, both referrals for the same client can be reported.
   # This statistic is a cumulative value for the reporting period and has the service recipient and age category.  Reporting is valid with age category – unknown, S489** 90.
 
-  # client accepted if "active" or "on waitlist"
-  # service_decision_date is the date on waitlist or start of service if not waitlisted
+  # One referral per FC episode, on the date it was accepted (see fc_episodes()), so each
+  # S489 pairs with at most one S513
 
 
   rlog::log_info("Generating S489 statistic")
 
+  # referrals need an eligibility decision date in the episode (see number_episodes())
   calc_489 <- mis_service_history |>
     filter_eligible("489") |>
-    dplyr::filter(service_status %in% c("Active", "On Waitlist"), !is.na(service_decision_date))
+    dplyr::filter(!is.na(episode_decision_date))
 
   report_489 <- function(grain) {
-    calc_489 |>
-      merge_overlaps(service_decision_date, service_status_end_date, report_date, merge_level = grain) |>
+    fc_episodes(calc_489, grain, report_date) |>
       dplyr::mutate(digits_1_3 = "489",
                     digits_4_5 = get_sr_code(funder_service_code),
                     digits_6_7 = participant_funder_age_group_code) |>
@@ -679,16 +659,11 @@ generate_visit_and_service_counts <- function(processed_data,
 
   # Periods when a client is on the organization's books, shared by S501 (admission) and S511 (file closed)
   # so that every admission pairs with a file closure.
-  # - starts at the eligibility decision date (OHRS: "The decision date of eligibility is the admit date")
+  # - starts at the episode's acceptance date (OHRS: "The decision date of eligibility is the admit date")
   # - covers On Waitlist, On Hold and Active; still-open enrollments run to tomorrow (prefilled end date)
-  # - each enrollment's discharge reason (from its Inactive row) is carried onto its other rows for S511
-  org_involvement <- mis_service_history |>
-    dplyr::group_by(service_enrollment_id) |>
-    dplyr::mutate(service_status_reason = dplyr::last(service_status_reason[service_status == "Inactive"])) |>
-    dplyr::ungroup() |>
-    dplyr::filter(service_status %in% c("On Waitlist", "On Hold", "Active")) |>
-    dplyr::mutate(involvement_start_date = dplyr::coalesce(service_decision_date, service_status_start_date)) |>
-    merge_overlaps(involvement_start_date, service_status_end_date, report_date, merge_level = "organization")
+  # - each episode's discharge reason (from its Inactive row) is used for S511
+  # This is fc_episodes() merged across all FCs with the same SR code.
+  org_involvement <- fc_episodes(mis_service_history, "organization", report_date)
 
   calc_org_501 <- org_involvement |>
 
@@ -721,23 +696,26 @@ generate_visit_and_service_counts <- function(processed_data,
 
   if(fc_506_version == "verA"){
 
-    ## Service history-based calculation
-    calc_506 <- mis_daily_census |>
-      filter_eligible("506") |>
-      dplyr::filter(service_status == "Active")
+    ## Service history-based calculation: the day service first started in each episode
+    ## (see fc_episodes()), so service that pauses and resumes is counted once
+    calc_506 <- mis_service_history |>
+      filter_eligible("506")
+
+    # age group on the day service started, from date of birth (as in the daily census)
+    age_on_day <- mis_daily_census |>
+      dplyr::distinct(participant_id, date, age_group_on_day = participant_funder_age_group_code) |>
+      dplyr::distinct(participant_id, date, .keep_all = TRUE)
 
     report_506 <- function(grain) {
-      calc_506 |>
-        # find first date within the FC or service (sum of service durations == 0)
-        dplyr::group_by(dplyr::pick(dplyr::all_of(c("date", "participant_id", "participant_funder_age_group_code", grain_cols(grain))))) |>
-        dplyr::summarize(service_status_duration = sum(service_status_duration)) |>
-        dplyr::ungroup() |>
-        dplyr::filter(service_status_duration == 0) |>
-
+      fc_episodes(calc_506, grain, report_date) |>
+        dplyr::filter(!is.na(first_active_date), first_active_date >= dashboard_start_date) |>
+        dplyr::left_join(age_on_day, by = c("participant_id", "first_active_date" = "date")) |>
+        dplyr::mutate(participant_funder_age_group_code = dplyr::coalesce(age_group_on_day, participant_funder_age_group_code)) |>
         dplyr::mutate(digits_1_3 = "506",
                       digits_4_5 = get_sr_code(funder_service_code),
                       digits_6_7 = participant_funder_age_group_code) |>
         assemble_statistical_account() |>
+        dplyr::rename(date = first_active_date) |>
         count_by_grain(grain)
     }
   }

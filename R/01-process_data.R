@@ -83,12 +83,18 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
                                                               "Active",
                                                               "Inactive"))) |>
 
+    # drop Active statuses corrected the same day (uses the recorded end dates)
+    drop_same_day_corrections() |>
+
     # reset service_start_end_date
     dplyr::group_by(service_enrollment_id) |>
     dplyr::arrange(service_enrollment_id, service_status_start_date, service_status) |>
     dplyr::mutate(service_status_end_date = dplyr::lead(service_status_start_date)) |>
     dplyr::ungroup() |>
-    dplyr::mutate(service_status_end_date = dplyr::coalesce(service_status_end_date, report_date + lubridate::days(1)))
+    dplyr::mutate(service_status_end_date = dplyr::coalesce(service_status_end_date, report_date + lubridate::days(1))) |>
+    number_episodes()
+
+  warn_missing_decision_dates(mis_service_history)
 
   if(!("participant_preferred_language" %in% colnames(mis_service_history))){
     mis_service_history <- mis_service_history |>

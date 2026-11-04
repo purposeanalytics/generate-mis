@@ -26,10 +26,13 @@ generate_tables <- function(data_folder = here::here("data"),
 
   tictoc::tic()
 
-  suppressWarnings({
+  # Warnings about the input data (data_warning()) are shown; others are still muffled
+  withCallingHandlers({
     processed_data <- process_data(data_folder, debug, report_date)
     census_counts <- generate_census_counts(processed_data, fc_455_version, fc_450_version)
     visit_and_service_counts <- generate_visit_and_service_counts(processed_data, fc_450_version, fc_506_version, ir_version)
+  }, warning = function(w) {
+    if (!inherits(w, "generateMIS_data_warning")) invokeRestart("muffleWarning")
   })
 
   rlog::log_info("MIS table generation complete!")

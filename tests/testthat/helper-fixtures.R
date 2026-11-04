@@ -6,15 +6,17 @@ mh_fc   <- "72 5 09 76"  # Case Management - Mental Health (fund type 2)
 mh3_fc  <- "73 5 09 76"  # Case Management - Mental Health (fund type 3)
 ps_fc   <- "72 5 82 33"  # CSS Personal Support/Independence Training
 cm_fc   <- "72 5 82 09"  # CSS Case Management
+act_fc  <- "72 5 10 76 20"  # MH Assertive Community Treatment Teams (episode rules, R1-R6)
 
 service_names <- c("72 5 09 76" = "MH Case Management",
                    "73 5 09 76" = "MH Case Management FT3",
                    "72 5 82 33" = "Personal Support",
-                   "72 5 82 09" = "CSS Case Management")
+                   "72 5 82 09" = "CSS Case Management",
+                   "72 5 10 76 20" = "ACT Team")
 
 # One service status row
 status <- function(participant_id, enrollment, fc, service_status, start,
-                   decision = NA, reason = NA_character_) {
+                   decision = NA, reason = NA_character_, end = NA) {
   tibble::tibble(
     participant_id = participant_id,
     service_enrollment_id = enrollment,
@@ -23,6 +25,7 @@ status <- function(participant_id, enrollment, fc, service_status, start,
     service_name = unname(service_names[fc]),
     service_status = service_status,
     service_status_start_date = as.Date(start),
+    service_status_end_date = as.Date(end),
     service_decision_date = as.Date(decision),
     service_status_reason = reason,
     service_first_direct_activity = lubridate::NA_Date_,
@@ -103,7 +106,36 @@ fixture_services <- function() {
     #   non-face-to-face visit. Requested service in French: S950 80 10 in the FC and
     #   S950 10 80 at AC 82 9 90. Physical disability: S955 80 10 in the FC.
     #   Language and special needs are on both the participant record and the activity.
-    status("P11", "E12", ps_fc, "Active", "2025-08-01", decision = "2025-08-01")
+    status("P11", "E12", ps_fc, "Active", "2025-08-01", decision = "2025-08-01"),
+
+    # R1-R6: episode rules (test-episode-rules.R), in their own FC with no visits.
+    # R1: service paused, then resumed: one episode
+    status("R1", "E13", act_fc, "Active",  "2025-04-07", decision = "2025-04-07"),
+    status("R1", "E13", act_fc, "On Hold", "2025-05-05", decision = "2025-04-07"),
+    status("R1", "E13", act_fc, "Active",  "2025-06-16", decision = "2025-04-07"),
+    # R2: discharged, then the file reopened: two episodes
+    status("R2", "E14", act_fc, "On Waitlist", "2025-04-14", decision = "2025-04-14"),
+    status("R2", "E14", act_fc, "Active",      "2025-05-12", decision = "2025-04-14"),
+    status("R2", "E14", act_fc, "Inactive",    "2025-06-09", decision = "2025-04-14", reason = "10 - Goals met"),
+    status("R2", "E14", act_fc, "On Waitlist", "2025-07-07", decision = "2025-07-07"),
+    status("R2", "E14", act_fc, "Active",      "2025-08-04", decision = "2025-07-07"),
+    # R3: back on the waitlist after service started: read as a hold, one episode
+    status("R3", "E15", act_fc, "On Waitlist", "2025-04-21", decision = "2025-04-21"),
+    status("R3", "E15", act_fc, "Active",      "2025-05-19", decision = "2025-04-21"),
+    status("R3", "E15", act_fc, "On Waitlist", "2025-06-23", decision = "2025-04-21"),
+    status("R3", "E15", act_fc, "Active",      "2025-07-21", decision = "2025-04-21"),
+    # R4: no decision date (an error in the source data): warned about, no referral (S489),
+    #   but the service that started is still counted
+    status("R4", "E16", act_fc, "On Waitlist", "2025-04-28"),
+    status("R4", "E16", act_fc, "Active",      "2025-05-26"),
+    # R5: Active entered and corrected the same day (back to waiting): the Active is dropped
+    status("R5", "E17", act_fc, "On Waitlist", "2025-04-02", decision = "2025-04-02", end = "2025-05-05"),
+    status("R5", "E17", act_fc, "Active",      "2025-05-05", decision = "2025-04-02", end = "2025-05-05"),
+    status("R5", "E17", act_fc, "On Waitlist", "2025-05-05", decision = "2025-04-02", end = "2025-06-02"),
+    status("R5", "E17", act_fc, "Active",      "2025-06-02", decision = "2025-04-02"),
+    # R6: put on the waitlist and started the same day: the Active is kept
+    status("R6", "E18", act_fc, "On Waitlist", "2025-04-08", decision = "2025-04-08", end = "2025-04-08"),
+    status("R6", "E18", act_fc, "Active",      "2025-04-08", decision = "2025-04-08")
   )
 }
 
@@ -153,10 +185,10 @@ fixture_activities <- function() {
 
 fixture_participants <- function() {
   tibble::tibble(
-    participant_id = paste0("P", 1:11),
+    participant_id = c(paste0("P", 1:11), paste0("R", 1:6)),
     participant_date_of_birth = as.Date("1980-01-01"),
-    participant_ohrs_special_needs = c(rep(NA_character_, 10), "Physical Disability"),
-    participant_preferred_language = c(rep("English", 10), "French")
+    participant_ohrs_special_needs = c(rep(NA_character_, 10), "Physical Disability", rep(NA_character_, 6)),
+    participant_preferred_language = c(rep("English", 10), "French", rep("English", 6))
   )
 }
 
@@ -184,9 +216,16 @@ run_mis <- function(report_date = "2025-09-30", ...) {
   readr::write_rds(fixture_fc_mapping(),   file.path(data_folder, "interim/rds/functional_centre_mapping.rds"))
 
   withr::local_envvar(LOG_LEVEL = "ERROR")
-  out <- suppressMessages(
-    generate_tables(data_folder, report_date = as.Date(report_date), ...)
+  # record warnings (e.g. R4's missing decision date) instead of repeating them in every test
+  warnings <- character()
+  out <- withCallingHandlers(
+    suppressMessages(generate_tables(data_folder, report_date = as.Date(report_date), ...)),
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
   )
+  attr(out, "warnings") <- warnings
   .mis_cache[[key]] <- out
   out
 }

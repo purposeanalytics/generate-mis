@@ -21,6 +21,7 @@ input_columns <- dplyr::tribble(
   "services",                   "service_decision_date",             "required",  "S407, S489, S501",
   "services",                   "service_status_reason",             "required",  "S511, S513 reason codes",
   "services",                   "participant_funder_age_group_code", "required",  "age groups",
+  "services",                   "service_status_end_date",           "expected",  "same-day Active corrections",
   "services",                   "service_first_direct_activity",     "expected",  "service start date",
 
   "activities",                 "participant_id",                    "required",  "all",
@@ -59,11 +60,10 @@ check_input_columns <- function(data, input) {
   expected <- spec[spec$level == "expected", ]
   missing_expected <- expected[!expected$column %in% colnames(data), ]
   for (i in seq_len(nrow(missing_expected))) {
-    warning(glue::glue("{input}.rds has no {missing_expected$column[i]} column; it is treated as blank, ",
-                       "so {missing_expected$used_for[i]} will be undercounted."),
-            call. = FALSE)
+    data_warning(glue::glue("{input}.rds has no {missing_expected$column[i]} column; it is treated as blank, ",
+                            "so {missing_expected$used_for[i]} will be undercounted."))
     column <- missing_expected$column[i]
-    data[[column]] <- if (column == "service_first_direct_activity") lubridate::NA_Date_ else NA_character_
+    data[[column]] <- if (column %in% c("service_first_direct_activity", "service_status_end_date")) lubridate::NA_Date_ else NA_character_
   }
 
   data

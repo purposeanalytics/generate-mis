@@ -245,8 +245,9 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
               last_service_status_reason = service_status_reason[which.max(end_date)],
               service_first_direct_activity = min(service_first_direct_activity),
               service_enrollment_id = min(service_enrollment_id),
-              # whether service started at any point in the merged period
-              ever_active = any(service_status == "Active")) |>
+              # whether service started at any point in the merged period, and when it first did
+              ever_active = any(service_status == "Active"),
+              first_active_date = first_date(service_status_start_date[service_status == "Active"])) |>
     dplyr::ungroup()
 
 }
@@ -390,4 +391,118 @@ one_per_person_per_day <- function(df, grain) {
     dplyr::arrange(dplyr::pick(dplyr::all_of(c(keys, "activity_type_priority")))) |>
     dplyr::slice(1) |>
     dplyr::ungroup()
+}
+
+# Earliest date, or NA if there are none (min() would warn and return Inf)
+first_date <- function(dates) {
+  if (length(dates) == 0 || all(is.na(dates))) lubridate::NA_Date_ else min(dates, na.rm = TRUE)
+}
+
+
+# Episodes ----
+# An episode is one stretch of time a person is on an FC's books for an enrollment, from
+# acceptance to discharge (OHRS Ch. 10, 10.9.4.4 examples 1 and 2). number_episodes() marks
+# them on the service history (sorted, with end dates set); fc_episodes() turns them into
+# one row per episode for the statistics that count referrals, first services, waits and
+# discharges.
+#
+# Rules (decided with the user, 2026-11-04):
+# - An Inactive status ends an episode. Any later status in the same enrollment starts a new
+#   one (the file was reopened), with its own referral, first service, wait and discharge.
+# - Once service has started in an episode, a later On Waitlist is treated as On Hold: there
+#   is no workflow where an active client goes back to waiting, so the episode continues and
+#   the client is not counted as waiting. The status as recorded is kept in
+#   service_status_recorded, so these cases can be followed up as data quality issues.
+# - Holds don't end an episode, so service that pauses and resumes has one first service.
+# - An Active status that starts and ends on the same day, when a waitlist status starts
+#   that day and carries on past it, was a correction (the client went straight back to
+#   waiting) and is dropped before episodes are numbered: see drop_same_day_corrections().
+#   This uses the status end dates as recorded in services.rds.
+# - episode_decision_date is the eligibility decision date for the episode. A decision date
+#   from before a reopened episode began belongs to an earlier episode. S489 needs one: an
+#   episode with no decision date has no referral counted, and process_data() warns about it:
+#   data prep should supply a decision date whenever a client is moved to Waitlist, Hold or
+#   Active, so a missing one is an error in the source data.
+# - accepted_date is when the FC took responsibility: the decision date, or if there is none,
+#   the first Waitlist, Hold or Active date. It is used to merge episodes and for S501/S511.
+# - Overlapping episodes in the same FC (or service) are merged into one, so a person has one
+#   referral and one first service while any of their enrollments there is open.
+number_episodes <- function(service_history) {
+  service_history |>
+    dplyr::group_by(service_enrollment_id) |>
+    dplyr::mutate(episode = cumsum(dplyr::lag(service_status == "Inactive", default = FALSE))) |>
+    dplyr::group_by(service_enrollment_id, episode) |>
+    dplyr::mutate(
+      service_status_recorded = service_status,
+      after_service_start = dplyr::lag(cumsum(service_status == "Active") > 0, default = FALSE),
+      service_status = dplyr::if_else(service_status == "On Waitlist" & after_service_start,
+                                      factor("On Hold", levels = levels(service_status)), service_status),
+      episode_start_date = min(service_status_start_date),
+      episode_decision_date = first_date(service_decision_date[episode == 0 | service_decision_date >= episode_start_date]),
+      accepted_date = dplyr::coalesce(
+        episode_decision_date,
+        first_date(service_status_start_date[service_status %in% c("On Waitlist", "On Hold", "Active")]),
+        episode_start_date),
+      # discharge reason, from the Inactive status that ended the episode
+      episode_discharge_reason = dplyr::last(service_status_reason[service_status == "Inactive"])) |>
+    dplyr::ungroup() |>
+    dplyr::select(-after_service_start, -episode_start_date)
+}
+
+# Drop Active statuses that were corrected the same day: the Active starts and ends on the
+# same day, and an On Waitlist status in the same enrollment starts that day and doesn't end
+# on it. Uses service_status_end_date as recorded in services.rds (blank = still current),
+# so it must run before end dates are recalculated.
+drop_same_day_corrections <- function(services) {
+  continuing_waitlists <- services |>
+    dplyr::filter(service_status == "On Waitlist",
+                  is.na(service_status_end_date) | service_status_end_date > service_status_start_date) |>
+    dplyr::distinct(service_enrollment_id, service_status_start_date)
+
+  corrected <- services |>
+    dplyr::filter(service_status == "Active", service_status_end_date == service_status_start_date) |>
+    dplyr::semi_join(continuing_waitlists, by = c("service_enrollment_id", "service_status_start_date")) |>
+    dplyr::distinct(service_enrollment_id, service_status, service_status_start_date)
+
+  dplyr::anti_join(services, corrected, by = c("service_enrollment_id", "service_status", "service_status_start_date"))
+}
+
+# A warning about the input data. generate_tables() lets these through while it still
+# muffles other warnings, so they always reach the person running it.
+data_warning <- function(message) {
+  warning(structure(class = c("generateMIS_data_warning", "warning", "condition"),
+                    list(message = message, call = NULL)))
+}
+
+# Warn about episodes that reached Waitlist, Hold or Active with no eligibility decision date.
+# These have no referral (S489) but can still have a first service (S506/S401), so the
+# counts won't pair up until the source data is corrected.
+warn_missing_decision_dates <- function(service_history) {
+  missing <- service_history |>
+    dplyr::filter(service_status %in% c("On Waitlist", "On Hold", "Active"), is.na(episode_decision_date)) |>
+    dplyr::distinct(service_enrollment_id, episode)
+
+  if (nrow(missing) > 0) {
+    enrollments <- unique(missing$service_enrollment_id)
+    shown <- paste(utils::head(enrollments, 10), collapse = ", ")
+    if (length(enrollments) > 10) shown <- paste0(shown, ", ...")
+    data_warning(glue::glue("{nrow(missing)} episode(s) were moved to Waitlist, Hold or Active with no ",
+                       "service_decision_date, so they have no referral (S489) but can still have a ",
+                       "first service (S506/S401). Correct the source data. Enrollment(s): {shown}"))
+  }
+
+  invisible(service_history)
+}
+
+# One row per FC (or service) episode: overlapping episodes in the same FC/service are merged,
+# from the earliest acceptance to the latest end. Open episodes run to the day after
+# report_date, so merged_end_date <= report_date means every episode in it has ended.
+# Columns used by the statistics: merged_start_date (accepted), first_active_date (first
+# service, NA if none), merged_end_date, last_service_status_reason (from the episode that
+# ended last) and participant_funder_age_group_code.
+fc_episodes <- function(service_history, grain, report_date) {
+  service_history |>
+    dplyr::filter(service_status %in% c("On Waitlist", "On Hold", "Active")) |>
+    dplyr::mutate(service_status_reason = episode_discharge_reason) |>
+    merge_overlaps(accepted_date, service_status_end_date, report_date, merge_level = grain)
 }
