@@ -1,3 +1,25 @@
+#' Apply fc_450_version to visits
+#'
+#' Used for every statistic built from visits, so visit counts and "served" counts
+#' (S455, S855, S950, S955) use the same visits.
+#'
+#' @param visits mis_visits
+#' @param fc_450_version "verA" counts only activities over 5 minutes (plus entries with no
+#'   reported time and all CSS Transportation); "verB" counts all activities.
+#'
+#' @return visits, filtered
+apply_fc_450_version <- function(visits, fc_450_version) {
+  fc_450_version <- match.arg(fc_450_version, c("verA", "verB"))
+
+  if (fc_450_version == "verA") {
+    visits <- visits |>
+      dplyr::filter(activity_duration > 5 | activity_duration == 0 | is.na(activity_duration) | funder_service_code == "72 5 82 14")
+  }
+
+  visits
+}
+
+
 # CSS case management FCs. Assessments here are client activity (visit, individual served);
 # in other CSS service delivery FCs they are not (OHRS Ch. 10, 10.9.4.4, S512).
 css_case_management_fcs <- c("72 5 82 09", "73 5 82 09")

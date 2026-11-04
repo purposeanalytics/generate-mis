@@ -28,7 +28,7 @@ generate_tables <- function(data_folder = here::here("data"),
 
   suppressWarnings({
     processed_data <- process_data(data_folder, debug, report_date)
-    census_counts <- generate_census_counts(processed_data, fc_455_version)
+    census_counts <- generate_census_counts(processed_data, fc_455_version, fc_450_version)
     visit_and_service_counts <- generate_visit_and_service_counts(processed_data, fc_450_version, fc_506_version, ir_version)
   })
 

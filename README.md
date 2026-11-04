@@ -47,6 +47,8 @@ This can take one of two conditions for counting visits under the "Visits" and "
 * `verA` which excludes visits that were 5 or fewer minutes in duration (but includes entries with no reported time interval)
 * `verB` which counts all visits regardless of duration (can be necessary for some bulk notes where client management system divides total time by number of clients)
 
+The same rule decides which visits count as evidence that someone was served (455 \*\* \*\*, 855 \*\* \*\*, 950 \*\* \*\*, 955 \*\* \*\*), so visit and individuals-served counts use the same visits.
+
 **fc_455_version**
 
 This can take one of three conditions for counting individuals under the "Individuals Served" statistics (455 \*\* \*\*, 855 \*\* \*\*, 950 \*\* \*\*, 955 \*\* \*\*):

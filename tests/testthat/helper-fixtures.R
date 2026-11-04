@@ -91,7 +91,11 @@ fixture_services <- function() {
     # P9: CMH&A client served in both fund type 2 and fund type 3 FCs, so counted once in
     #   S855 at AC 82 9 90 and once at AC 83 9 90
     status("P9", "E9",  mh_fc,  "Active", "2025-04-01", decision = "2025-04-01"),
-    status("P9", "E10", mh3_fc, "Active", "2025-04-01", decision = "2025-04-01")
+    status("P9", "E10", mh3_fc, "Active", "2025-04-01", decision = "2025-04-01"),
+
+    # P10: CMH&A client whose only contact is a 3-minute call. Not a visit under
+    #   fc_450_version = "verA", so not served (S455 / S855) either; both under "verB".
+    status("P10", "E11", mh_fc, "Active", "2025-08-01", decision = "2025-08-01")
   )
 }
 
@@ -122,13 +126,16 @@ fixture_activities <- function() {
 
     # P9: one visit in each fund type
     activity("P9", "E9",  mh_fc,  "2025-06-10", "Face-to-face", 30),
-    activity("P9", "E10", mh3_fc, "2025-06-11", "Face-to-face", 30)
+    activity("P9", "E10", mh3_fc, "2025-06-11", "Face-to-face", 30),
+
+    # P10: 3-minute call only
+    activity("P10", "E11", mh_fc, "2025-08-05", "Non-face-to-face", 3)
   )
 }
 
 fixture_participants <- function() {
   tibble::tibble(
-    participant_id = paste0("P", 1:9),
+    participant_id = paste0("P", 1:10),
     participant_date_of_birth = as.Date("1980-01-01"),
     participant_ohrs_special_needs = NA_character_,
     participant_preferred_language = "English"

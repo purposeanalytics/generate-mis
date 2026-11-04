@@ -7,16 +7,19 @@
 #'
 #' @examples
 generate_census_counts <- function(processed_data,
-                                   fc_455_version = "verA"){
+                                   fc_455_version = "verA",
+                                   fc_450_version = "verA"){
 
-  rlog::log_info(glue::glue("Applying fc_455_version = '{fc_455_version}' to census counts"))
+  rlog::log_info(glue::glue("Applying fc_455_version = '{fc_455_version}' and fc_450_version = '{fc_450_version}' to census counts"))
 
   data_folder <- processed_data$data_folder
   mis_service_history <- processed_data$mis_service_history
   # Visits used as evidence that someone was served (S455, S855, S950, S955).
   # In CSS service delivery FCs an assessment is not client activity; it counts only in
   # the CSS case management FC (OHRS Ch. 10, 10.9.4.4, S512).
+  # Only visits that count under fc_450_version are evidence of service, as in the visit counts.
   mis_visits <- processed_data$mis_visits |>
+    apply_fc_450_version(fc_450_version) |>
     dplyr::filter(!(activity_type %in% "Assessment" &
                       get_sr_code(funder_service_code) == "80" &
                       !funder_service_code %in% css_case_management_fcs))

@@ -20,14 +20,8 @@ generate_visit_and_service_counts <- function(processed_data,
   mis_unregistered_interactions <- processed_data$mis_unregistered_interactions
   mis_daily_census <- processed_data$mis_daily_census
 
-  # Apply fc_450_version
-  if(fc_450_version == "verA"){
-
-    # interactions must be > 5 min to count; include entries with no reported time interval and all CSS Transportation
-    mis_visits <- mis_visits |>
-      dplyr::filter(activity_duration > 5 | activity_duration == 0 | is.na(activity_duration) | funder_service_code == "72 5 82 14")
-
-  }
+  # Apply fc_450_version (same rule as in generate_census_counts)
+  mis_visits <- apply_fc_450_version(mis_visits, fc_450_version)
 
   # S248 ** ** Meals Delivered (Number of)
   # Report for FC 72 5 82 10 (Meals Delivery Services) at combined or detailed (hot meal, frozen meal and side dish) level but not both.  Beverages are not counted.  Refer to Section 10.10.3 FC 72 5 82 10 for examples.
