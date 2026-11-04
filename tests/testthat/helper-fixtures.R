@@ -119,11 +119,12 @@ fixture_services <- function() {
     status("R2", "E14", act_fc, "Inactive",    "2025-06-09", decision = "2025-04-14", reason = "10 - Goals met"),
     status("R2", "E14", act_fc, "On Waitlist", "2025-07-07", decision = "2025-07-07"),
     status("R2", "E14", act_fc, "Active",      "2025-08-04", decision = "2025-07-07"),
-    # R3: back on the waitlist after service started: read as a hold, one episode
+    # R3: back on the waitlist after service started: discharged, then a new episode
+    #   (OHRS Ch. 10, 10.9.4.4 example 2)
     status("R3", "E15", act_fc, "On Waitlist", "2025-04-21", decision = "2025-04-21"),
     status("R3", "E15", act_fc, "Active",      "2025-05-19", decision = "2025-04-21"),
-    status("R3", "E15", act_fc, "On Waitlist", "2025-06-23", decision = "2025-04-21"),
-    status("R3", "E15", act_fc, "Active",      "2025-07-21", decision = "2025-04-21"),
+    status("R3", "E15", act_fc, "On Waitlist", "2025-06-23", decision = "2025-06-23"),
+    status("R3", "E15", act_fc, "Active",      "2025-07-21", decision = "2025-06-23"),
     # R4: no decision date (an error in the source data): warned about, no referral (S489),
     #   but the service that started is still counted
     status("R4", "E16", act_fc, "On Waitlist", "2025-04-28"),

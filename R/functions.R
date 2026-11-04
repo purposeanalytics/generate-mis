@@ -221,7 +221,9 @@ assemble_statistical_account <- function(df){
 #' @export
 #'
 #' @examples
-merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge_level){
+# `breaks` (optional, logical column): a row flagged TRUE starts a new merged period when it
+# starts on or after the latest end so far, instead of only when it starts after it.
+merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge_level, breaks = FALSE){
 
   grouping_variables <- overlap_grouping(merge_level)
 
@@ -230,8 +232,11 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
     dplyr::arrange(participant_id, {{dimension_start}}) |>
     dplyr::mutate(sr_code = get_sr_code(funder_service_code)) |>
     dplyr::group_by(participant_id, dplyr::pick(dplyr::all_of(grouping_variables))) |>
-    dplyr::mutate(index = c(0, cumsum(as.numeric(dplyr::lead({{dimension_start}})) >
-                                 cummax(as.numeric(end_date)))[-dplyr::n()])) |>
+    dplyr::mutate(.break = {{breaks}},
+                  .next_start = as.numeric(dplyr::lead({{dimension_start}})),
+                  .latest_end = cummax(as.numeric(end_date)),
+                  index = c(0, cumsum(.next_start > .latest_end |
+                                        (dplyr::lead(.break) & .next_start >= .latest_end))[-dplyr::n()])) |>
     dplyr::group_by(participant_id, participant_funder_age_group_code, index, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::summarize(merged_start_date = dplyr::first({{dimension_start}}),
               # latest end in the merged period (the last-starting row may end earlier)
@@ -409,10 +414,10 @@ first_date <- function(dates) {
 # Rules (decided with the user, 2026-11-04):
 # - An Inactive status ends an episode. Any later status in the same enrollment starts a new
 #   one (the file was reopened), with its own referral, first service, wait and discharge.
-# - Once service has started in an episode, a later On Waitlist is treated as On Hold: there
-#   is no workflow where an active client goes back to waiting, so the episode continues and
-#   the client is not counted as waiting. The status as recorded is kept in
-#   service_status_recorded, so these cases can be followed up as data quality issues.
+# - Once service has started in an episode, a return to On Waitlist also ends it: the client
+#   is discharged from the service (S513) and the waitlist starts a new episode with a new
+#   referral (S489), wait and first service (OHRS Ch. 10, 10.9.4.4 example 2). The client
+#   stays the organization's responsibility, so there is no S511/S501.
 # - Holds don't end an episode, so service that pauses and resumes has one first service.
 # - An Active status that starts and ends on the same day, when a waitlist status starts
 #   that day and carries on past it, was a correction (the client went straight back to
@@ -426,27 +431,44 @@ first_date <- function(dates) {
 # - accepted_date is when the FC took responsibility: the decision date, or if there is none,
 #   the first Waitlist, Hold or Active date. It is used to merge episodes and for S501/S511.
 # - Overlapping episodes in the same FC (or service) are merged into one, so a person has one
-#   referral and one first service while any of their enrollments there is open.
+#   referral and one first service while any of their enrollments there is open. Episodes of
+#   the same enrollment are never merged with each other, even when one ends the day the next
+#   begins.
+episode_numbers <- function(enrollment, status) {
+  episode <- integer(length(status))
+  current <- 0L
+  active_seen <- FALSE
+  for (i in seq_along(status)) {
+    if (i > 1 && enrollment[i] != enrollment[i - 1]) {
+      current <- 0L
+      active_seen <- FALSE
+    } else if (i > 1 && (status[i - 1] == "Inactive" || (status[i] == "On Waitlist" && active_seen))) {
+      current <- current + 1L
+      active_seen <- FALSE
+    }
+    if (status[i] == "Active") active_seen <- TRUE
+    episode[i] <- current
+  }
+  episode
+}
+
 number_episodes <- function(service_history) {
+  # expects rows sorted by enrollment, then status start date (as process_data() leaves them)
   service_history |>
-    dplyr::group_by(service_enrollment_id) |>
-    dplyr::mutate(episode = cumsum(dplyr::lag(service_status == "Inactive", default = FALSE))) |>
+    dplyr::mutate(episode = episode_numbers(service_enrollment_id, as.character(service_status))) |>
     dplyr::group_by(service_enrollment_id, episode) |>
     dplyr::mutate(
-      service_status_recorded = service_status,
-      after_service_start = dplyr::lag(cumsum(service_status == "Active") > 0, default = FALSE),
-      service_status = dplyr::if_else(service_status == "On Waitlist" & after_service_start,
-                                      factor("On Hold", levels = levels(service_status)), service_status),
       episode_start_date = min(service_status_start_date),
       episode_decision_date = first_date(service_decision_date[episode == 0 | service_decision_date >= episode_start_date]),
       accepted_date = dplyr::coalesce(
         episode_decision_date,
         first_date(service_status_start_date[service_status %in% c("On Waitlist", "On Hold", "Active")]),
         episode_start_date),
-      # discharge reason, from the Inactive status that ended the episode
+      # discharge reason, from the Inactive status that ended the episode (none if the client
+      # went back to the waitlist)
       episode_discharge_reason = dplyr::last(service_status_reason[service_status == "Inactive"])) |>
     dplyr::ungroup() |>
-    dplyr::select(-after_service_start, -episode_start_date)
+    dplyr::select(-episode_start_date)
 }
 
 # Drop Active statuses that were corrected the same day: the Active starts and ends on the
@@ -503,6 +525,13 @@ warn_missing_decision_dates <- function(service_history) {
 fc_episodes <- function(service_history, grain, report_date) {
   service_history |>
     dplyr::filter(service_status %in% c("On Waitlist", "On Hold", "Active")) |>
-    dplyr::mutate(service_status_reason = episode_discharge_reason) |>
-    merge_overlaps(accepted_date, service_status_end_date, report_date, merge_level = grain)
+    dplyr::group_by(service_enrollment_id, episode) |>
+    # first row of a later episode: not merged with the episode before it
+    dplyr::mutate(new_episode = episode > 0 & dplyr::row_number() == 1) |>
+    dplyr::ungroup() |>
+    dplyr::mutate(service_status_reason = episode_discharge_reason,
+                  # at the organization level the client is still on the books
+                  new_episode = new_episode & grain != "organization") |>
+    merge_overlaps(accepted_date, service_status_end_date, report_date, merge_level = grain,
+                   breaks = new_episode)
 }

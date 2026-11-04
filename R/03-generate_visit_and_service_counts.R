@@ -171,8 +171,8 @@ generate_visit_and_service_counts <- function(processed_data,
   # (service starts at enrollment into the FC, Ch. 7 s7.7.8, step 8). Days stop when On
   # Waitlist ends, so On Hold days aren't counted. Waits that ended without service
   # (withdrawal, discharge) and people still waiting aren't counted. A return to the waitlist
-  # after service started is treated as On Hold (see number_episodes()), so only the wait
-  # before first service in each episode counts.
+  # after service started begins a new episode (see number_episodes()), so that wait counts
+  # when service starts again.
   calc_407 <- mis_service_history |>
     filter_eligible("407") |>
     dplyr::group_by(service_enrollment_id, episode) |>
