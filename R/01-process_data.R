@@ -17,30 +17,23 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
   activities <- readr::read_rds(paste0(data_folder, "/interim/rds/activities.rds"))
   functional_centre_mapping <- readr::read_rds(paste0(data_folder, "/interim/rds/functional_centre_mapping.rds"))
 
+  # Stop on missing required columns; warn and fill blanks for missing expected ones
+  # (see input_columns in R/input_columns.R)
+  participants <- check_input_columns(participants, "participants")
+  services <- check_input_columns(services, "services")
+  activities <- check_input_columns(activities, "activities")
+  functional_centre_mapping <- check_input_columns(functional_centre_mapping, "functional_centre_mapping")
+
   # Nothing should be dated after report_date; drop anything that is, so a run reflects
   # the data as at report_date. Statuses that start later are removed, and decision and
   # first-service dates that fall later are treated as not yet known.
   services <- services |>
     dplyr::filter(service_status_start_date <= report_date) |>
-    dplyr::mutate(service_decision_date = dplyr::if_else(service_decision_date > report_date, lubridate::NA_Date_, service_decision_date))
-
-  if("service_first_direct_activity" %in% colnames(services)){
-    services <- services |>
-      dplyr::mutate(service_first_direct_activity = dplyr::if_else(service_first_direct_activity > report_date, lubridate::NA_Date_, service_first_direct_activity))
-  }
+    dplyr::mutate(service_decision_date = dplyr::if_else(service_decision_date > report_date, lubridate::NA_Date_, service_decision_date),
+                  service_first_direct_activity = dplyr::if_else(service_first_direct_activity > report_date, lubridate::NA_Date_, service_first_direct_activity))
 
   activities <- activities |>
     dplyr::filter(activity_date <= report_date)
-
-  if(!("participant_ohrs_special_needs" %in% colnames(participants))){
-    participants <- participants |>
-      dplyr::mutate(participant_ohrs_special_needs = NA_character_)
-  }
-
-  if(!("participant_preferred_language" %in% colnames(participants))){
-    participants <- participants |>
-      dplyr::mutate(participant_preferred_language = NA_character_)
-  }
 
 
   # Build service list ----
@@ -61,11 +54,6 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "491"), "Group Participant Attendances", funder_target_category ),
            funder_target_key = dplyr::if_else(!is.na(funder_target_category), glue::glue("{funder_service_code}_{funder_target_category}"), NA_character_)) |>
     dplyr::filter(!is.na(funder_service_name))
-
-  if(!("service_department" %in% colnames(service_list))){
-    service_list <- service_list |>
-      dplyr::mutate(service_department = NA_character_)
-  }
 
   readr::write_csv(service_list, paste0(data_folder, "/processed/service_list.csv"), na = "")
 
@@ -107,11 +95,6 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
       dplyr::mutate(participant_preferred_language = NA_character_)
   }
 
-  if(!("service_first_direct_activity" %in% colnames(mis_service_history))){
-    mis_service_history <- mis_service_history |>
-      dplyr::mutate(service_first_direct_activity = lubridate::NA_Date_)
-  }
-
   # to speed up debugging
   if(debug == TRUE) {
     mis_service_history <- mis_service_history |>
@@ -127,21 +110,6 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
 
     # include all activity_durations for Transportation
     dplyr::mutate(activity_duration = dplyr::if_else(funder_service_code == "72 5 82 14", dplyr::if_else(activity_duration < 5, 6, activity_duration), activity_duration))
-
-  if(!("participant_ohrs_special_needs" %in% colnames(mis_visits))){
-    mis_visits <- mis_visits |>
-      dplyr::mutate(participant_ohrs_special_needs = NA_character_)
-  }
-
-  if(!("participant_preferred_language" %in% colnames(mis_visits))){
-    mis_visits <- mis_visits |>
-      dplyr::mutate(participant_preferred_language = NA_character_)
-  }
-
-  if(!("activity_assessment" %in% colnames(mis_visits))){
-    mis_visits <- mis_visits |>
-      dplyr::mutate(activity_assessment = NA_character_)
-  }
 
 
   rlog::log_info("Building MIS unregistered interactions table")

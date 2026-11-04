@@ -75,6 +75,57 @@ This can take one of two conditions which assigns either CMHA or CSS statistical
 
 The date the run is "as at". It defaults to today. Records dated after it are ignored: service statuses that start later and activities on later dates are dropped, and decision or first-service dates that fall later are treated as not yet known. Statuses that are still open are treated as running to the day after this date.
 
+## Input files
+
+`generate_tables()` reads four files from `data_folder/interim/rds/`. If a **required** column is missing, the run stops with an error that names it. If an **expected** column is missing, the run warns and carries on with that column blank, so the statistics shown will be undercounted. Exports should always include the expected columns.
+
+The full list is `input_columns` in `R/input_columns.R`. Keep this section in step with it.
+
+**participants.rds**, one row per participant
+
+| Column | Level | Used for |
+|---|---|---|
+| `participant_id` | required | all |
+| `participant_date_of_birth` | required | age groups in the daily census |
+| `participant_preferred_language` | expected | 950 (fc_455_version `verA`, `verC`) |
+| `participant_ohrs_special_needs` | expected | 955 (fc_455_version `verA`, `verC`) |
+
+**services.rds**, one row per service status
+
+| Column | Level | Used for |
+|---|---|---|
+| `participant_id`, `service_enrollment_id`, `service_id`, `funder_service_code`, `service_status`, `service_status_start_date` | required | all |
+| `service_name` | required | counts by service |
+| `service_decision_date` | required | 407, 489, 501 |
+| `service_status_reason` | required | 511, 513 reason codes |
+| `participant_funder_age_group_code` | required | age groups |
+| `service_first_direct_activity` | expected | service start date |
+
+**activities.rds**, one row per activity
+
+| Column | Level | Used for |
+|---|---|---|
+| `participant_id`, `service_id`, `funder_service_code`, `activity_date`, `activity_type`, `activity_individual_group`, `activity_status` | required | all |
+| `service_name` | required | counts by service |
+| `activity_duration` | required | 450/451 (fc_450_version), hours of care |
+| `activity_count` | required | visits, interactions |
+| `activity_worker_count` | required | interactions, hours of care |
+| `activity_group_id` | required | group sessions and attendance |
+| `participant_funder_age_group_code` | required | age groups |
+| `participant_preferred_language` | expected | 950 (fc_455_version `verB`) |
+| `participant_ohrs_special_needs` | expected | 955 (fc_455_version `verB`) |
+| `activity_assessment` | expected | CSS assessments |
+| `service_sub_service_name` | expected | 248 meal types |
+
+Under fc_455_version `verB`, language and special needs come from the activity records, because that version counts people from their visits. The other versions take them from the participant record.
+
+**functional_centre_mapping.rds**, one row per functional centre
+
+| Column | Level | Used for |
+|---|---|---|
+| `funder_service_code` | required | all |
+| `service_name`, `service_department` | expected | service list for the Power BI report |
+
 ## Tests
 
 The tests in `tests/testthat` run the full pipeline on a small set of made-up clients, each set up to check one counting rule. Run them with:

@@ -25,6 +25,7 @@ status <- function(participant_id, enrollment, fc, service_status, start,
     service_status_start_date = as.Date(start),
     service_decision_date = as.Date(decision),
     service_status_reason = reason,
+    service_first_direct_activity = lubridate::NA_Date_,
     participant_funder_age_group_code = "40"
   )
 }
@@ -68,7 +69,8 @@ fixture_services <- function() {
     status("P2", "E2", mh_fc, "Active",      "2025-05-11", decision = "2025-04-01"),
 
     # P3: still waiting for assessment at the end of Q2. Counted in S406 99 10 on Sep 30;
-    #   no days waited (S407 99 10) because no decision has been made.
+    #   no days waited (S407 99 10) because no decision has been made. Has one visit while
+    #   waiting, so is served under fc_455_version = "verB" (visit-based) only.
     status("P3", "E3", mh_fc, "Waiting for Assessment", "2025-09-01"),
 
     # P4: on the waitlist, then withdrew before service started. In S406 25 20 while
@@ -95,7 +97,13 @@ fixture_services <- function() {
 
     # P10: CMH&A client whose only contact is a 3-minute call. Not a visit under
     #   fc_450_version = "verA", so not served (S455 / S855) either; both under "verB".
-    status("P10", "E11", mh_fc, "Active", "2025-08-01", decision = "2025-08-01")
+    status("P10", "E11", mh_fc, "Active", "2025-08-01", decision = "2025-08-01"),
+
+    # P11: French-speaking CSS personal support client with a physical disability and one
+    #   non-face-to-face visit. Requested service in French: S950 80 10 in the FC and
+    #   S950 10 80 at AC 82 9 90. Physical disability: S955 80 10 in the FC.
+    #   Language and special needs are on both the participant record and the activity.
+    status("P11", "E12", ps_fc, "Active", "2025-08-01", decision = "2025-08-01")
   )
 }
 
@@ -109,6 +117,9 @@ fixture_activities <- function() {
     activity("P1", "E1", mh_fc, "2025-05-12", "Non-face-to-face", 3),
     # P1, May 19: counts as a non-face-to-face visit
     activity("P1", "E1", mh_fc, "2025-05-19", "Non-face-to-face", 15),
+
+    # P3: a visit while still waiting for assessment (not enrolled)
+    activity("P3", "E3", mh_fc, "2025-09-10", "Face-to-face", 30),
 
     # P2: one visit after service starts
     activity("P2", "E2", mh_fc, "2025-05-20", "Face-to-face", 45),
@@ -129,22 +140,30 @@ fixture_activities <- function() {
     activity("P9", "E10", mh3_fc, "2025-06-11", "Face-to-face", 30),
 
     # P10: 3-minute call only
-    activity("P10", "E11", mh_fc, "2025-08-05", "Non-face-to-face", 3)
-  )
+    activity("P10", "E11", mh_fc, "2025-08-05", "Non-face-to-face", 3),
+
+    # P11: phone visit
+    activity("P11", "E12", ps_fc, "2025-08-12", "Non-face-to-face", 30)
+  ) |>
+    # Language and special needs as recorded on each activity, which is what
+    # fc_455_version = "verB" reads; the other versions read the participant record.
+    dplyr::mutate(participant_preferred_language = dplyr::if_else(participant_id == "P11", "French", "English"),
+                  participant_ohrs_special_needs = dplyr::if_else(participant_id == "P11", "Physical Disability", NA_character_))
 }
 
 fixture_participants <- function() {
   tibble::tibble(
-    participant_id = paste0("P", 1:10),
+    participant_id = paste0("P", 1:11),
     participant_date_of_birth = as.Date("1980-01-01"),
-    participant_ohrs_special_needs = NA_character_,
-    participant_preferred_language = "English"
+    participant_ohrs_special_needs = c(rep(NA_character_, 10), "Physical Disability"),
+    participant_preferred_language = c(rep("English", 10), "French")
   )
 }
 
 fixture_fc_mapping <- function() {
   tibble::tibble(funder_service_code = names(service_names),
-                 service_name = unname(service_names))
+                 service_name = unname(service_names),
+                 service_department = NA_character_)
 }
 
 # Write the fixtures to a temporary data folder and run the full pipeline.

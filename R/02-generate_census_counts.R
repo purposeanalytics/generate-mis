@@ -524,8 +524,9 @@ generate_census_counts <- function(processed_data,
 
     calc_service_950 <- mis_visits |>
       filter_eligible("950") |>
+      # 2026-01-07 mis_visits already filtered for direct interactions
       # remove indirect and clinical entries
-      dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
+      # dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
       dplyr::filter(participant_preferred_language == "French") |>
 
       # assemble funder_statistical_account_code
