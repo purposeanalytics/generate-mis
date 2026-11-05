@@ -79,13 +79,9 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
     dplyr::filter(!service_enrollment_id %in% non_admissions) |>
 
     # remove "Waiting for Service Initiation" as this is only counted for time spent on waitlist; waiting for assessment then becomes the time from referral to decision date
-    dplyr::filter(service_status != "Waiting for Service Initiation") |>
-    dplyr::mutate(service_status = factor(service_status, levels = c("Waiting for Assessment",
-                                                              "On Waitlist",
-                                                              "On Hold",
-                                                              "Not Admitted",
-                                                              "Active",
-                                                              "Inactive"))) |>
+    dplyr::filter(is.na(service_status) | service_status != "Waiting for Service Initiation") |>
+    drop_unusable_statuses() |>
+    dplyr::mutate(service_status = factor(service_status, levels = service_status_levels)) |>
 
     # drop Active statuses corrected the same day (uses the recorded end dates)
     drop_same_day_corrections() |>

@@ -534,6 +534,34 @@ data_warning <- function(message) {
                     list(message = message, call = NULL)))
 }
 
+service_status_levels <- c("Waiting for Assessment", "On Waitlist", "On Hold",
+                           "Not Admitted", "Active", "Inactive")
+
+# Drop service history rows that can't be placed in an episode: a status that isn't one of
+# service_status_levels, or no enrollment id. Warns with the labels found so the source
+# data (or the status mapping in data prep) can be corrected.
+drop_unusable_statuses <- function(services) {
+  unknown <- !is.na(services$service_status) & !services$service_status %in% service_status_levels
+  blank_status <- is.na(services$service_status)
+  no_enrollment <- is.na(services$service_enrollment_id)
+
+  if (any(unknown)) {
+    counts <- table(services$service_status[unknown])
+    labels <- paste0('"', names(counts), '" (', as.integer(counts), ")", collapse = ", ")
+    data_warning(glue::glue("{sum(unknown)} service status row(s) have a status generateMIS doesn't ",
+                            "recognise and were dropped: {labels}. Expected one of: ",
+                            "{paste(service_status_levels, collapse = ', ')}."))
+  }
+  if (any(blank_status)) {
+    data_warning(glue::glue("{sum(blank_status)} service status row(s) have no service_status and were dropped."))
+  }
+  if (any(no_enrollment)) {
+    data_warning(glue::glue("{sum(no_enrollment)} service status row(s) have no service_enrollment_id and were dropped."))
+  }
+
+  services[!(unknown | blank_status | no_enrollment), ]
+}
+
 # Warn about episodes that reached Waitlist, Hold or Active with no eligibility decision date.
 # These have no referral (S489) but can still have a first service (S506/S401), so the
 # counts won't pair up until the source data is corrected.
