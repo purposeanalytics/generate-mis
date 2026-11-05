@@ -9,6 +9,7 @@ cm_fc   <- "72 5 82 09"  # CSS Case Management
 act_fc  <- "72 5 10 76 20"  # MH Assertive Community Treatment Teams (episode rules, R1-R6)
 day_fc  <- "72 5 20 76 10"  # Day/Night Care - Mental Health (attendance days, S483)
 tr3_fc  <- "73 5 82 14"     # CSS Transportation - Client (fund type 3)
+al_fc   <- "72 5 82 45"     # CSS Assisted Living (residential: S410/S411 instead of S513)
 
 service_names <- c("72 5 09 76" = "MH Case Management",
                    "73 5 09 76" = "MH Case Management FT3",
@@ -16,7 +17,8 @@ service_names <- c("72 5 09 76" = "MH Case Management",
                    "72 5 82 09" = "CSS Case Management",
                    "72 5 10 76 20" = "ACT Team",
                    "72 5 20 76 10" = "MH Day Program",
-                   "73 5 82 14" = "Transportation FT3")
+                   "73 5 82 14" = "Transportation FT3",
+                   "72 5 82 45" = "Assisted Living")
 
 # One service status row
 status <- function(participant_id, enrollment, fc, service_status, start,
@@ -145,7 +147,14 @@ fixture_services <- function() {
     # P12: MH day program (see fixture_activities())
     status("P12", "E19", day_fc, "Active", "2025-04-15", decision = "2025-04-15"),
     # P13: CSS transportation, fund type 3
-    status("P13", "E20", tr3_fc, "Active", "2025-04-01", decision = "2025-04-01")
+    status("P13", "E20", tr3_fc, "Active", "2025-04-01", decision = "2025-04-01"),
+
+    # P14: assisted living, died in care on Jun 17 (S411, not S410)
+    status("P14", "E21", al_fc, "Active",   "2025-04-22", decision = "2025-04-22"),
+    status("P14", "E21", al_fc, "Inactive", "2025-06-17", decision = "2025-04-22", reason = "20 - Death"),
+    # P15: assisted living, moved out on Jun 24 (S410)
+    status("P15", "E22", al_fc, "Active",   "2025-04-22", decision = "2025-04-22"),
+    status("P15", "E22", al_fc, "Inactive", "2025-06-24", decision = "2025-04-22", reason = "60 - Client preference")
   )
 }
 
@@ -204,7 +213,7 @@ fixture_activities <- function() {
 
 fixture_participants <- function() {
   tibble::tibble(
-    participant_id = c(paste0("P", 1:13), paste0("R", 1:6)),
+    participant_id = c(paste0("P", 1:15), paste0("R", 1:6)),
     participant_date_of_birth = as.Date("1980-01-01")
   ) |>
     dplyr::mutate(participant_ohrs_special_needs = dplyr::if_else(participant_id == "P11", "Physical Disability", NA_character_),
@@ -245,6 +254,7 @@ run_mis <- function(report_date = "2025-09-30", ...) {
     }
   )
   attr(out, "warnings") <- warnings
+  attr(out, "data_folder") <- data_folder
   .mis_cache[[key]] <- out
   out
 }

@@ -53,7 +53,11 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "483"), "Attendance Days", funder_target_category ),
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "491"), "Group Participant Attendances", funder_target_category ),
            funder_target_key = dplyr::if_else(!is.na(funder_target_category), glue::glue("{funder_service_code}_{funder_target_category}"), NA_character_)) |>
-    dplyr::filter(!is.na(funder_service_name))
+    dplyr::filter(!is.na(funder_service_name)) |>
+    # how the statistic rolls up over a period (see statistic_aggregation)
+    dplyr::mutate(statistic = stringr::str_sub(funder_statistical_account_code, 1, 3)) |>
+    dplyr::left_join(statistic_aggregation, by = "statistic") |>
+    dplyr::select(-statistic)
 
   readr::write_csv(service_list, paste0(data_folder, "/processed/service_list.csv"), na = "")
 

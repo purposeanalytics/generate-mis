@@ -233,9 +233,14 @@ generate_visit_and_service_counts <- function(processed_data,
   # Note: Service discharges from residential functional centre 7* 540 * are counted in  S410 45 *0 Resident Discharge (from functional centre).
 
 
-  rlog::log_info("Generating S410 & S513 statistic")
+  # S411 ** *0 Inpatient/Resident Deaths
+  # Reported instead of S410 in the CSS residential FCs when the client died while in their care
+  # (S410 counts live discharges only). OHRS Ch. 10, 10.9.4.3.3.
 
-  ## CSS residential FCs report S410 instead of S513 (OHRS Ch. 10, 10.9.4.3.3: 7* 5 82 40, 7* 5 82 45, 7* 5 83 45)
+  rlog::log_info("Generating S410, S411 & S513 statistic")
+
+  ## CSS residential FCs report S410 (or S411 for a death) instead of S513
+  ## (OHRS Ch. 10, 10.9.4.3.3: 7* 5 82 40, 7* 5 82 45, 7* 5 83 45)
   css_residential_fcs <- c("72 5 82 40", "72 5 82 45", "72 5 83 45",
                            "73 5 82 40", "73 5 82 45", "73 5 83 45")
 
@@ -256,7 +261,10 @@ generate_visit_and_service_counts <- function(processed_data,
       # reason from the enrollment discharged last
       dplyr::mutate(service_status_reason_code = stringr::str_sub(last_service_status_reason, 1, 2),
                     service_status_reason_code = dplyr::if_else(stringr::str_detect(service_status_reason_code, "^\\d\\d$"), service_status_reason_code, "90", missing = "90")) |>
-      add_statistical_account(statistic = dplyr::if_else(funder_service_code %in% css_residential_fcs, "410", "513"),
+      # reason 20 = death while in the care of the organization
+      add_statistical_account(statistic = dplyr::case_when(funder_service_code %in% css_residential_fcs & service_status_reason_code == "20" ~ "411",
+                                                           funder_service_code %in% css_residential_fcs ~ "410",
+                                                           .default = "513"),
                               sr_category = default_sr_category(funder_service_code),
                               detail = dplyr::if_else(funder_service_code %in% css_residential_fcs, participant_funder_age_group_code, service_status_reason_code)) |>
       dplyr::rename(date = merged_end_date) |>
