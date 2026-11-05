@@ -17,14 +17,13 @@ generate_census_counts <- function(processed_data,
   data_folder <- processed_data$data_folder
   mis_service_history <- processed_data$mis_service_history
   # Visits used as evidence that someone was served (S455, S855, S950, S955).
-  # In CSS service delivery FCs an assessment is not client activity; it counts only in
-  # the CSS case management FC (OHRS Ch. 10, 10.9.4.4, S512).
+  # An assessment is client activity only in the CSS case management FC (OHRS Ch. 10,
+  # 10.9.4.4, S512). CMH&A has no assessment activity type (assessments are recorded as
+  # visits), so any other "Assessment" activity is not evidence of service.
   # Only visits that count under fc_450_version are evidence of service, as in the visit counts.
   mis_visits <- processed_data$mis_visits |>
     apply_fc_450_version(fc_450_version) |>
-    dplyr::filter(!(activity_type %in% "Assessment" &
-                      get_sr_code(funder_service_code) == "80" &
-                      !funder_service_code %in% css_case_management_fcs))
+    dplyr::filter(!(activity_type %in% "Assessment" & !funder_service_code %in% css_case_management_fcs))
 
   # Fund type = 2nd digit of the FC (e.g. 72 -> 2, 73 -> 3); CMH&A S855 is reported by fund type
   # in AC 8* 9 90 (OHRS Ch. 7, 7.1.4 and 7.7.6)

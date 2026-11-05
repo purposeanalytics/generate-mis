@@ -13,7 +13,7 @@ apply_fc_450_version <- function(visits, fc_450_version) {
 
   if (fc_450_version == "verA") {
     visits <- visits |>
-      dplyr::filter(activity_duration > 5 | activity_duration == 0 | is.na(activity_duration) | funder_service_code == "72 5 82 14")
+      dplyr::filter(activity_duration > 5 | activity_duration == 0 | is.na(activity_duration) | funder_service_code %in% css_transportation_fcs)
   }
 
   visits
@@ -23,6 +23,15 @@ apply_fc_450_version <- function(visits, fc_450_version) {
 # CSS case management FCs. Assessments here are client activity (visit, individual served);
 # in other CSS service delivery FCs they are not (OHRS Ch. 10, 10.9.4.4, S512).
 css_case_management_fcs <- c("72 5 82 09", "73 5 82 09")
+
+# FCs with their own activity rules. Each is written 7* in the OHRS, so both the 72 and 73
+# fund types are listed.
+# CSS Meals Delivery: every activity type counts (meals are counted, not visits; S248)
+css_meals_delivery_fcs <- c("72 5 82 10", "73 5 82 10")
+# CSS Transportation-Client: every trip counts, however short (no 5-minute rule)
+css_transportation_fcs <- c("72 5 82 14", "73 5 82 14")
+# Information and Referral Services - General: SR 65 under ir_version = "verCMHA"
+info_referral_fcs <- c("72 5 70 10", "73 5 70 10")
 
 
 #' Calculate age from birth date
@@ -252,6 +261,8 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
               service_enrollment_id = min_or_blank(service_enrollment_id),
               # whether service started at any point in the merged period, and when it first did
               ever_active = any(service_status == "Active"),
+              # earliest eligibility decision in the merged period (NA if none)
+              episode_decision_date = first_date(episode_decision_date),
               first_active_date = first_date(service_status_start_date[service_status == "Active"])) |>
     dplyr::ungroup()
 
@@ -490,9 +501,10 @@ warn_missing_decision_dates <- function(service_history) {
 # One row per FC (or service) episode: overlapping episodes in the same FC/service are merged,
 # from the earliest acceptance to the latest end. Open episodes run to the day after
 # report_date, so merged_end_date <= report_date means every episode in it has ended.
-# Columns used by the statistics: merged_start_date (accepted), first_active_date (first
-# service, NA if none), merged_end_date, last_service_status_reason (from the episode that
-# ended last) and participant_funder_age_group_code.
+# Columns used by the statistics: merged_start_date (accepted), episode_decision_date (NA if
+# none), first_active_date (first service, NA if none), merged_end_date,
+# last_service_status_reason (from the episode that ended last) and
+# participant_funder_age_group_code.
 fc_episodes <- function(service_history, grain, report_date) {
   service_history |>
     dplyr::filter(service_status %in% c("On Waitlist", "On Hold", "Active")) |>

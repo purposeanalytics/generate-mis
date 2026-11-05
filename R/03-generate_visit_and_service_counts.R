@@ -382,7 +382,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(get_sr_code(funder_service_code) == "80") |>
     dplyr::filter(activity_individual_group == "Individual") |>
     dplyr::mutate(digits_1_3 = "452",
-                  digits_4_5 = dplyr::if_else(funder_service_code == "72 5 70 10" & ir_version == "verCMHA", "65", "60"),
+                  digits_4_5 = dplyr::if_else(funder_service_code %in% info_referral_fcs & ir_version == "verCMHA", "65", "60"),
                   digits_6_7 = "00") |>
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)
@@ -522,18 +522,18 @@ generate_visit_and_service_counts <- function(processed_data,
 
   rlog::log_info("Generating S489 statistic")
 
-  # referrals need an eligibility decision date in the episode (see number_episodes())
   calc_489 <- mis_service_history |>
-    filter_eligible("489") |>
-    dplyr::filter(!is.na(episode_decision_date))
+    filter_eligible("489")
 
   report_489 <- function(grain) {
     fc_episodes(calc_489, grain, report_date) |>
+      # a referral needs an eligibility decision date (see number_episodes())
+      dplyr::filter(!is.na(episode_decision_date)) |>
       dplyr::mutate(digits_1_3 = "489",
                     digits_4_5 = get_sr_code(funder_service_code),
                     digits_6_7 = participant_funder_age_group_code) |>
       assemble_statistical_account() |>
-      dplyr::rename(date = merged_start_date) |>
+      dplyr::rename(date = episode_decision_date) |>
       count_by_grain(grain)
   }
 
@@ -553,7 +553,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(get_sr_code(funder_service_code) == "80") |>
     dplyr::filter(activity_individual_group == "Group") |>
     dplyr::mutate(digits_1_3 = "491",
-                  digits_4_5 = dplyr::if_else(funder_service_code == "72 5 70 10" & ir_version == "verCMHA", "65", "60"),
+                  digits_4_5 = dplyr::if_else(funder_service_code %in% info_referral_fcs & ir_version == "verCMHA", "65", "60"),
                   digits_6_7 = "10") |>
     assemble_statistical_account() |>
     dplyr::rename(date = activity_date)

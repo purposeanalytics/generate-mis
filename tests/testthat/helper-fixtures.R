@@ -7,12 +7,16 @@ mh3_fc  <- "73 5 09 76"  # Case Management - Mental Health (fund type 3)
 ps_fc   <- "72 5 82 33"  # CSS Personal Support/Independence Training
 cm_fc   <- "72 5 82 09"  # CSS Case Management
 act_fc  <- "72 5 10 76 20"  # MH Assertive Community Treatment Teams (episode rules, R1-R6)
+day_fc  <- "72 5 20 76 10"  # Day/Night Care - Mental Health (attendance days, S483)
+tr3_fc  <- "73 5 82 14"     # CSS Transportation - Client (fund type 3)
 
 service_names <- c("72 5 09 76" = "MH Case Management",
                    "73 5 09 76" = "MH Case Management FT3",
                    "72 5 82 33" = "Personal Support",
                    "72 5 82 09" = "CSS Case Management",
-                   "72 5 10 76 20" = "ACT Team")
+                   "72 5 10 76 20" = "ACT Team",
+                   "72 5 20 76 10" = "MH Day Program",
+                   "73 5 82 14" = "Transportation FT3")
 
 # One service status row
 status <- function(participant_id, enrollment, fc, service_status, start,
@@ -136,7 +140,12 @@ fixture_services <- function() {
     status("R5", "E17", act_fc, "Active",      "2025-06-02", decision = "2025-04-02"),
     # R6: put on the waitlist and started the same day: the Active is kept
     status("R6", "E18", act_fc, "On Waitlist", "2025-04-08", decision = "2025-04-08", end = "2025-04-08"),
-    status("R6", "E18", act_fc, "Active",      "2025-04-08", decision = "2025-04-08")
+    status("R6", "E18", act_fc, "Active",      "2025-04-08", decision = "2025-04-08"),
+
+    # P12: MH day program (see fixture_activities())
+    status("P12", "E19", day_fc, "Active", "2025-04-15", decision = "2025-04-15"),
+    # P13: CSS transportation, fund type 3
+    status("P13", "E20", tr3_fc, "Active", "2025-04-01", decision = "2025-04-01")
   )
 }
 
@@ -176,7 +185,16 @@ fixture_activities <- function() {
     activity("P10", "E11", mh_fc, "2025-08-05", "Non-face-to-face", 3),
 
     # P11: phone visit
-    activity("P11", "E12", ps_fc, "2025-08-12", "Non-face-to-face", 30)
+    activity("P11", "E12", ps_fc, "2025-08-12", "Non-face-to-face", 30),
+
+    # P12: a 3-minute attendance on Jun 3 (S483 under fc_450_version = "verB" only), and an
+    #   activity recorded as "Assessment" on Jun 10, which isn't evidence of service outside
+    #   CSS case management (CMH&A records assessments as visits)
+    activity("P12", "E19", day_fc, "2025-06-03", "Face-to-face", 3),
+    activity("P12", "E19", day_fc, "2025-06-10", "Assessment", 60),
+
+    # P13: a 3-minute trip. Transportation has no 5-minute rule, in either fund type.
+    activity("P13", "E20", tr3_fc, "2025-06-04", "Face-to-face", 3)
   ) |>
     # Language and special needs as recorded on each activity, which is what
     # fc_455_version = "verB" reads; the other versions read the participant record.
@@ -186,11 +204,11 @@ fixture_activities <- function() {
 
 fixture_participants <- function() {
   tibble::tibble(
-    participant_id = c(paste0("P", 1:11), paste0("R", 1:6)),
-    participant_date_of_birth = as.Date("1980-01-01"),
-    participant_ohrs_special_needs = c(rep(NA_character_, 10), "Physical Disability", rep(NA_character_, 6)),
-    participant_preferred_language = c(rep("English", 10), "French", rep("English", 6))
-  )
+    participant_id = c(paste0("P", 1:13), paste0("R", 1:6)),
+    participant_date_of_birth = as.Date("1980-01-01")
+  ) |>
+    dplyr::mutate(participant_ohrs_special_needs = dplyr::if_else(participant_id == "P11", "Physical Disability", NA_character_),
+                  participant_preferred_language = dplyr::if_else(participant_id == "P11", "French", "English"))
 }
 
 fixture_fc_mapping <- function() {

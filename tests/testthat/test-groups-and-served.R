@@ -24,5 +24,6 @@ test_that("CMH&A S855 is counted separately by fund type", {
   expect_equal(people(census, "82 9 90", "855 25 54"), c("P1", "P2", "P9"))
   expect_equal(people(census, "83 9 90", "855 25 54"), "P9")
   # CSS
-  expect_equal(people(census, "82 9 90", "855 80 54"), c("P11", "P5", "P6", "P8"))
+  # CSS: one count for the organization across fund types (P13 is in fund type 3)
+  expect_equal(people(census, "82 9 90", "855 80 54"), c("P11", "P13", "P5", "P6", "P8"))
 })
