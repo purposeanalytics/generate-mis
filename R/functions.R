@@ -138,22 +138,20 @@ fast_age_calculation <- function(df, date_of_birth, reference_date, feb29_as = "
 }
 
 
-#' Determine the service recipient code (statistical account digits 4 and 5) based on functional centre code
-#'
-#' @param fc_code
-#'
-#' @return
-#' @export
-#'
-#' @examples
-get_sr_code <- function(fc_code) {
-
-  code <- dplyr::case_when(
-    (stringr::str_sub({{fc_code}}, 9, 10) == "76" | stringr::str_sub({{fc_code}},  9, 10) == "78") & stringr::str_sub({{fc_code}}, 6, 7) == "40" ~ "45",
-    (stringr::str_sub({{fc_code}}, 9, 10) == "76" | stringr::str_sub({{fc_code}},  9, 10) == "78") & stringr::str_sub({{fc_code}}, 6, 7) != "40" ~ "25",
-    # Centralized/Coordinated Access is a CMH&A FC (OHRS Ch 7) with no 76/78 in its code
-    stringr::str_detect({{fc_code}}, "^7[23] 5 08$") ~ "25",
-    .default = "80")  # if not "76" (mental health) or "78" (addictions), default to "80" (community support services)
+# Default service recipient (SR) category for an FC: digits 4 and 5 of most of its
+# statistical accounts. Some statistics use a different category (e.g. S452 60/65, S407 99,
+# S950 10, S483 25 in residential FCs), set where the account is built.
+# - 45: CMH&A residential (7* 5 40 ** with 76 mental health or 78 addictions)
+# - 25: other CMH&A (76 or 78), and Centralized/Coordinated Access (7* 5 08, OHRS Ch. 7)
+# - 80: everything else (community support services)
+default_sr_category <- function(funder_service_code) {
+  mh_addictions <- stringr::str_sub(funder_service_code, 9, 10) %in% c("76", "78")
+  residential <- stringr::str_sub(funder_service_code, 6, 7) == "40"
+  dplyr::case_when(
+    mh_addictions & residential ~ "45",
+    mh_addictions ~ "25",
+    stringr::str_detect(funder_service_code, "^7[23] 5 08$") ~ "25",
+    .default = "80")
 }
 
 
@@ -202,19 +200,62 @@ get_time_intervals <- function(activity_duration){
 }
 
 
-#' Combine parts to create statistical account code
-#'
-#' @param df
-#'
-#' @return
-#' @export
-#'
-#' @examples
-assemble_statistical_account <- function(df){
+# Build funder_statistical_account_code ("ddd dd dd") from digits_1_3 (statistic),
+# digits_4_5 (SR category) and digits_6_7 (detail, e.g. age group or reason), then drop the
+# helper columns. A part with the wrong number of digits is a bug in the statistic, so the
+# run stops. A blank part (e.g. an unmapped meal type) comes from the data: the row is kept
+# and a data warning names the account, which can't be reported as it stands.
+assemble_statistical_account <- function(df) {
+  widths <- c(digits_1_3 = 3, digits_4_5 = 2, digits_6_7 = 2)
+  blank <- rep(FALSE, nrow(df))
 
-  df |>
-    dplyr::mutate(funder_statistical_account_code = paste(digits_1_3, digits_4_5, digits_6_7))
+  for (col in names(widths)) {
+    part <- as.character(df[[col]])
+    # a blank pasted into a part (paste0(NA, "1")) reads as "NA..."
+    part_blank <- is.na(part) | grepl("NA", part, fixed = TRUE)
+    wrong <- !part_blank & !grepl(paste0("^[0-9]{", widths[[col]], "}$"), part)
+    if (any(wrong)) {
+      stop(glue::glue("{col} must be {widths[[col]]} digits; got {paste(unique(part[wrong]), collapse = ', ')}"),
+           call. = FALSE)
+    }
+    blank <- blank | part_blank
+  }
 
+  df <- dplyr::mutate(df, funder_statistical_account_code = paste(digits_1_3, digits_4_5, digits_6_7))
+
+  if (any(blank)) {
+    accounts <- unique(df$funder_statistical_account_code[blank])
+    data_warning(glue::glue("{sum(blank)} row(s) have a statistical account with a blank part ",
+                            "({paste(utils::head(accounts, 10), collapse = ', ')}), so they can't be reported ",
+                            "as they stand. Check the input columns the statistic uses."))
+  }
+
+  dplyr::select(df, -dplyr::any_of(c("digits_1_3", "digits_4_5", "digits_6_7", "digits_6", "digits_7")))
+}
+
+# Warn about FC/account pairs in an output table that aren't in the OHRS code table
+# (all_functional_centres_and_statistical_codes), naming up to 15. Each is either a rule
+# that builds an account the FC doesn't report, or a gap in the code table. The code table
+# has no fund type 3 copy of the organization FC, so 83 9 90 is checked against 82 9 90.
+check_accounts <- function(output, table_name) {
+  valid <- all_functional_centres_and_statistical_codes |>
+    dplyr::distinct(funder_service_code, funder_statistical_account_code)
+
+  unknown <- output |>
+    dplyr::distinct(funder_service_code, funder_statistical_account_code) |>
+    dplyr::mutate(check_code = dplyr::if_else(funder_service_code == "83 9 90", "82 9 90", funder_service_code)) |>
+    dplyr::anti_join(valid, by = c("check_code" = "funder_service_code", "funder_statistical_account_code")) |>
+    dplyr::arrange(funder_statistical_account_code, funder_service_code)
+
+  if (nrow(unknown) > 0) {
+    pairs <- paste0(unknown$funder_service_code, ": ", unknown$funder_statistical_account_code)
+    shown <- paste(utils::head(pairs, 15), collapse = "; ")
+    if (length(pairs) > 15) shown <- paste0(shown, "; ...")
+    data_warning(glue::glue("{nrow(unknown)} FC/account pair(s) in {table_name} aren't in the OHRS code table: ",
+                            "{shown}. Check the rule that builds them, or update the code table."))
+  }
+
+  invisible(output)
 }
 
 
@@ -239,7 +280,7 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
   df |>
     dplyr::mutate(end_date = dplyr::if_else(is.na({{dimension_end}}), {{report_end}} + lubridate::days(1), {{dimension_end}})) |>
     dplyr::arrange(participant_id, {{dimension_start}}) |>
-    dplyr::mutate(sr_code = get_sr_code(funder_service_code)) |>
+    dplyr::mutate(sr_code = default_sr_category(funder_service_code)) |>
     dplyr::group_by(participant_id, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::mutate(.break = {{breaks}},
                   .next_start = as.numeric(dplyr::lead({{dimension_start}})),
@@ -295,7 +336,7 @@ earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, me
   df |>
     dplyr::mutate(end_date = dplyr::if_else(is.na({{dimension_end}}), {{report_end}} + lubridate::days(1), {{dimension_end}})) |>
     dplyr::arrange(participant_id, {{dimension_start}}) |>
-    dplyr::mutate(sr_code = get_sr_code(funder_service_code)) |>
+    dplyr::mutate(sr_code = default_sr_category(funder_service_code)) |>
     dplyr::group_by(participant_id, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::mutate(index = c(0, cumsum(as.numeric(dplyr::lead({{dimension_start}})) >
                                         cummax(as.numeric(end_date)))[-dplyr::n()])) |>

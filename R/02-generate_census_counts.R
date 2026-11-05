@@ -51,7 +51,7 @@ generate_census_counts <- function(processed_data,
       dplyr::filter(service_status == "Active") |>
       dplyr::distinct(dplyr::pick(dplyr::all_of(c("participant_id", "participant_funder_age_group_code", grain_cols(grain), "date")))) |>
       dplyr::mutate(digits_1_3 = "403",
-                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_4_5 = default_sr_category(funder_service_code),
                     digits_6_7 = participant_funder_age_group_code) |>
       assemble_statistical_account() |>
       count_by_grain(grain)
@@ -72,7 +72,7 @@ generate_census_counts <- function(processed_data,
       dplyr::filter(service_status_start_date != date) |>
       dplyr::distinct(dplyr::pick(dplyr::all_of(c("date", "participant_id", grain_cols(grain), "service_status")))) |>
       dplyr::mutate(digits_1_3 = "406",
-                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_4_5 = default_sr_category(funder_service_code),
                     digits_6_7 = "20") |>
       assemble_statistical_account() |>
       count_by_grain(grain)
@@ -151,7 +151,7 @@ generate_census_counts <- function(processed_data,
                 match_on = keys) |>
       min_age_group_by_fiscal_year(by = keys) |>
       dplyr::mutate(digits_1_3 = "455",
-                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_4_5 = default_sr_category(funder_service_code),
                     digits_6_7 = participant_funder_age_group_code) |>
       assemble_statistical_account() |>
       dplyr::select(date, dplyr::all_of(keys), funder_statistical_account_code, participant_id)
@@ -171,7 +171,7 @@ generate_census_counts <- function(processed_data,
 
   # CSS: one count for the organization (AC 82 9 90); under verA the visit can be in any FC
   calc_org_855_css <- served_days("participant_funder_age_group_code",
-                                  keep = function(df) dplyr::filter(df, get_sr_code(funder_service_code) == "80")) |>
+                                  keep = function(df) dplyr::filter(df, default_sr_category(funder_service_code) == "80")) |>
     min_age_group_by_fiscal_year() |>
     dplyr::mutate(funder_service_code = "82 9 90",
                   digits_1_3 = "855",
@@ -182,7 +182,7 @@ generate_census_counts <- function(processed_data,
 
   # CMH&A: one count per fund type, in the organizational AC for that fund type (AC 82 9 90, 83 9 90)
   calc_org_855_cmha <- served_days(c("fund_type", "participant_funder_age_group_code"),
-                                   keep = function(df) dplyr::filter(df, get_sr_code(funder_service_code) != "80"),
+                                   keep = function(df) dplyr::filter(df, default_sr_category(funder_service_code) != "80"),
                                    match_on = "fund_type") |>
     min_age_group_by_fiscal_year(by = "fund_type") |>
     dplyr::mutate(funder_service_code = paste0("8", fund_type, " 9 90"),
@@ -254,7 +254,7 @@ generate_census_counts <- function(processed_data,
                 keep = function(df) df |> filter_eligible("955") |> dplyr::filter(!is.na(participant_ohrs_special_needs)),
                 match_on = keys) |>
       dplyr::mutate(digits_1_3 = "955",
-                    digits_4_5 = get_sr_code(funder_service_code),
+                    digits_4_5 = default_sr_category(funder_service_code),
                     digits_6_7 = dplyr::case_when(participant_ohrs_special_needs == "Physical Disability" ~ "10",
                                                   participant_ohrs_special_needs == "Cognitive Impairment" ~ "15",
                                                   participant_ohrs_special_needs == "Frail And-or Elderly" ~ "20",
@@ -274,6 +274,7 @@ generate_census_counts <- function(processed_data,
                                               calc_950("fc"), calc_955("fc")) |>
     dplyr::mutate(funder_key = paste0(funder_service_code, "_", funder_statistical_account_code))
 
+  check_accounts(mis_census_counts_by_fc, "mis_census_counts_by_fc")
   readr::write_csv(mis_census_counts_by_fc, paste0(data_folder, "/processed/mis_census_counts_by_fc.csv"), na = "")
 
 
