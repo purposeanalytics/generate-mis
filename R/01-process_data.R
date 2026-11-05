@@ -96,11 +96,6 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
 
   warn_missing_decision_dates(mis_service_history)
 
-  if(!("participant_preferred_language" %in% colnames(mis_service_history))){
-    mis_service_history <- mis_service_history |>
-      dplyr::mutate(participant_preferred_language = NA_character_)
-  }
-
   # to speed up debugging
   if(debug == TRUE) {
     mis_service_history <- mis_service_history |>
@@ -115,7 +110,13 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
     dplyr::filter(activity_type %in% c("Face-to-face", "Face-to-face Virtual", "Non-face-to-face", "Assessment", "Meal delivery") | activity_individual_group == "Group" | funder_service_code %in% css_meals_delivery_fcs) |>
 
     # include all activity_durations for Transportation
-    dplyr::mutate(activity_duration = dplyr::if_else(funder_service_code %in% css_transportation_fcs, dplyr::if_else(activity_duration < 5, 6, activity_duration), activity_duration))
+    dplyr::mutate(activity_duration = dplyr::if_else(funder_service_code %in% css_transportation_fcs, dplyr::if_else(activity_duration < 5, 6, activity_duration), activity_duration)) |>
+
+    # language and special needs are participant facts: take them from participants, not from
+    # any copy on the activity rows
+    dplyr::select(-dplyr::any_of(c("participant_preferred_language", "participant_ohrs_special_needs"))) |>
+    dplyr::left_join(participants |>
+                       dplyr::select(participant_id, participant_preferred_language, participant_ohrs_special_needs), by = "participant_id")
 
 
   rlog::log_info("Building MIS unregistered interactions table")

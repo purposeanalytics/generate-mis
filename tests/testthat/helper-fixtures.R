@@ -204,11 +204,7 @@ fixture_activities <- function() {
 
     # P13: a 3-minute trip. Transportation has no 5-minute rule, in either fund type.
     activity("P13", "E20", tr3_fc, "2025-06-04", "Face-to-face", 3)
-  ) |>
-    # Language and special needs as recorded on each activity, which is what
-    # fc_455_version = "verB" reads; the other versions read the participant record.
-    dplyr::mutate(participant_preferred_language = dplyr::if_else(participant_id == "P11", "French", "English"),
-                  participant_ohrs_special_needs = dplyr::if_else(participant_id == "P11", "Physical Disability", NA_character_))
+  )
 }
 
 fixture_participants <- function() {

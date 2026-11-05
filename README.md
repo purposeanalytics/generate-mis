@@ -87,8 +87,8 @@ The full list is `input_columns` in `R/input_columns.R`. Keep this section in st
 |---|---|---|
 | `participant_id` | required | all |
 | `participant_date_of_birth` | required | age groups in the daily census |
-| `participant_preferred_language` | expected | 950 (fc_455_version `verA`, `verC`) |
-| `participant_ohrs_special_needs` | expected | 955 (fc_455_version `verA`, `verC`) |
+| `participant_preferred_language` | expected | 950 |
+| `participant_ohrs_special_needs` | expected | 955 |
 
 **services.rds**, one row per service status
 
@@ -112,12 +112,10 @@ The full list is `input_columns` in `R/input_columns.R`. Keep this section in st
 | `activity_worker_count` | required | interactions, hours of care |
 | `activity_group_id` | required | group sessions and attendance |
 | `participant_funder_age_group_code` | required | age groups |
-| `participant_preferred_language` | expected | 950 (fc_455_version `verB`) |
-| `participant_ohrs_special_needs` | expected | 955 (fc_455_version `verB`) |
 | `activity_assessment` | expected | CSS assessments |
 | `service_sub_service_name` | expected | 248 meal types |
 
-Under fc_455_version `verB`, language and special needs come from the activity records, because that version counts people from their visits. The other versions take them from the participant record.
+Language and special needs are recorded once per participant and read from participants.rds in every fc_455_version. Copies of these columns on services or activities are ignored.
 
 **functional_centre_mapping.rds**, one row per functional centre
 

@@ -8,8 +8,8 @@ input_columns <- dplyr::tribble(
   ~input,                       ~column,                             ~level,      ~used_for,
   "participants",               "participant_id",                    "required",  "all",
   "participants",               "participant_date_of_birth",         "required",  "age groups in the daily census",
-  "participants",               "participant_preferred_language",    "expected",  "S950 (fc_455_version verA, verC)",
-  "participants",               "participant_ohrs_special_needs",    "expected",  "S955 (fc_455_version verA, verC)",
+  "participants",               "participant_preferred_language",    "expected",  "S950",
+  "participants",               "participant_ohrs_special_needs",    "expected",  "S955",
 
   "services",                   "participant_id",                    "required",  "all",
   "services",                   "service_enrollment_id",             "required",  "all",
@@ -37,8 +37,6 @@ input_columns <- dplyr::tribble(
   "activities",                 "activity_worker_count",             "required",  "interactions, hours of care",
   "activities",                 "activity_group_id",                 "required",  "group sessions and attendance",
   "activities",                 "participant_funder_age_group_code", "required",  "age groups",
-  "activities",                 "participant_preferred_language",    "expected",  "S950 (fc_455_version verB)",
-  "activities",                 "participant_ohrs_special_needs",    "expected",  "S955 (fc_455_version verB)",
   "activities",                 "activity_assessment",               "expected",  "CSS assessments",
   "activities",                 "service_sub_service_name",          "expected",  "S248 meal types",
 
