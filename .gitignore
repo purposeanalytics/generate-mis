@@ -4,3 +4,4 @@
 .Ruserdata
 NEWS.md
 dev/baseline.rds
+tests/testthat/_problems/
