@@ -244,14 +244,22 @@ generate_census_counts <- function(processed_data,
     rlog::log_info(glue::glue("Generating S955 statistic by {grain}"))
     keys <- grain_cols(grain)
     served_days(c(keys, "participant_ohrs_special_needs"),
-                keep = function(df) df |> filter_eligible("955") |> dplyr::filter(!is.na(participant_ohrs_special_needs)),
+                # only FCs with the special-needs breakdown; some (e.g. 72 5 82 12) only have the S955 initiative accounts
+                keep = function(df) df |> filter_eligible("955 80 (10|15|20|25)") |> dplyr::filter(!is.na(participant_ohrs_special_needs)),
                 match_on = keys) |>
       add_statistical_account(statistic = "955",
                               sr_category = default_sr_category(funder_service_code),
                               detail = dplyr::case_when(participant_ohrs_special_needs == "Physical Disability" ~ "10",
                                                         participant_ohrs_special_needs == "Cognitive Impairment" ~ "15",
                                                         participant_ohrs_special_needs == "Frail And-or Elderly" ~ "20",
-                                                        participant_ohrs_special_needs == "High Risk Senior" ~ "22",
+                                                        # S955 80 22 is only for Assisted Living (82 45); elsewhere a high risk
+                                                        # senior counts as frail and/or elderly so S955 still sums to S455.
+                                                        # Alternative (not configured in AlayaCare yet): a separate High Risk
+                                                        # Senior field that overrides special needs in 82 45 only, so clients
+                                                        # keep their underlying special need in the other FCs.
+                                                        participant_ohrs_special_needs == "High Risk Senior" &
+                                                          stringr::str_detect(funder_service_code, "^7[23] 5 82 45") ~ "22",
+                                                        participant_ohrs_special_needs == "High Risk Senior" ~ "20",
                                                         participant_ohrs_special_needs == "Living With Effects Of HIV-AIDS" ~ "25")) |>
       dplyr::select(date, dplyr::all_of(keys), funder_statistical_account_code, participant_id)
   }
