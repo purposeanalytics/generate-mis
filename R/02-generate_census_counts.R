@@ -112,24 +112,25 @@ generate_census_counts <- function(processed_data,
   served_days <- function(cols, keep = identity, match_on = character(0)) {
     id_cols <- c("date", "participant_id", cols)
 
-    if (fc_455_version == "verB") {
-      return(mis_visits |>
-               keep() |>
-               dplyr::rename(date = activity_date) |>
-               dplyr::distinct(dplyr::pick(dplyr::all_of(id_cols))))
+    visit_days <- function() {
+      mis_visits |>
+        keep() |>
+        dplyr::rename(date = activity_date) |>
+        dplyr::distinct(dplyr::pick(dplyr::all_of(id_cols)))
     }
 
-    enrolled <- mis_daily_census |>
-      dplyr::filter(service_status == "Active") |>
-      keep() |>
-      dplyr::distinct(dplyr::pick(dplyr::all_of(id_cols)))
-
-    if (fc_455_version == "verA") {
-      enrolled <- enrolled |>
-        dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id", match_on))
+    active_days <- function() {
+      mis_daily_census |>
+        dplyr::filter(service_status == "Active") |>
+        keep() |>
+        dplyr::distinct(dplyr::pick(dplyr::all_of(id_cols)))
     }
 
-    enrolled
+    switch(fc_455_version,
+           verA = active_days() |>
+             dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id", match_on)),
+           verB = visit_days(),
+           verC = active_days())
   }
 
 
