@@ -666,12 +666,10 @@ generate_visit_and_service_counts <- function(processed_data,
   org_involvement <- fc_episodes(mis_service_history, "organization", report_date)
 
   calc_org_501 <- org_involvement |>
+    dplyr::rename(date = merged_start_date) |>
 
-    # get min. age group code for fiscal year (i.e. age group on latest visit/end of period)
-    dplyr::mutate(fiscal_year = lubridate::quarter(merged_start_date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)) |>
-    dplyr::group_by(participant_id, sr_code, fiscal_year) |>
-    dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
-    dplyr::ungroup() |>
+    # age group at the latest admission in the fiscal year
+    min_age_group_by_fiscal_year(by = "sr_code") |>
 
     # add organizational functional centre
     dplyr::mutate(funder_service_code = "82 9 90") |>
@@ -681,8 +679,6 @@ generate_visit_and_service_counts <- function(processed_data,
                   digits_4_5 = sr_code,
                   digits_6_7 = participant_funder_age_group_code) |>
     assemble_statistical_account() |>
-
-    dplyr::rename(date = merged_start_date) |>
     dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
 
 

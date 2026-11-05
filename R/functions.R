@@ -240,7 +240,7 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
     dplyr::group_by(participant_id, participant_funder_age_group_code, index, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::summarize(merged_start_date = dplyr::first({{dimension_start}}),
               # latest end in the merged period (the last-starting row may end earlier)
-              merged_end_date = max(end_date),
+              merged_end_date = max_or_blank(end_date),
               all_starts = paste({{dimension_start}}, collapse = ", "),
               all_ends = paste({{dimension_end}}, collapse = ", "),
               all_funder_service_codes = paste(funder_service_code, collapse = ", "),
@@ -248,46 +248,11 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
               all_service_status_reasons = paste(service_status_reason, collapse = ", "),
               # reason on the row that ended last (e.g. the final discharge in the period)
               last_service_status_reason = service_status_reason[which.max(end_date)],
-              service_first_direct_activity = min(service_first_direct_activity),
-              service_enrollment_id = min(service_enrollment_id),
+              service_first_direct_activity = min_or_blank(service_first_direct_activity),
+              service_enrollment_id = min_or_blank(service_enrollment_id),
               # whether service started at any point in the merged period, and when it first did
               ever_active = any(service_status == "Active"),
               first_active_date = first_date(service_status_start_date[service_status == "Active"])) |>
-    dplyr::ungroup()
-
-}
-
-#' Intersect overlapping program enrollments (useful for finding last discharge date on inactive status)
-#'
-#' @param df
-#' @param dimension_start
-#' @param dimension_end
-#' @param report_end
-#' @param merge_level
-#'
-#' @return
-#' @export
-#'
-#' @examples
-intersect_overlaps <- function(df, dimension_start, dimension_end, report_end, merge_level){
-
-  grouping_variables <- overlap_grouping(merge_level)
-
-  df |>
-    dplyr::mutate(end_date = dplyr::if_else(is.na({{dimension_end}}), {{report_end}} + lubridate::days(1), {{dimension_end}})) |>
-    dplyr::arrange(participant_id, {{dimension_start}}) |>
-    dplyr::mutate(sr_code = get_sr_code(funder_service_code)) |>
-    dplyr::group_by(participant_id, dplyr::pick(dplyr::all_of(grouping_variables))) |>
-    dplyr::mutate(index = c(0, cumsum(as.numeric(dplyr::lead({{dimension_start}})) >
-                                 cummax(as.numeric(end_date)))[-dplyr::n()])) |>
-    dplyr::group_by(participant_id, participant_funder_age_group_code, index, dplyr::pick(dplyr::all_of(grouping_variables))) |>
-    dplyr::summarize(merged_start_date = dplyr::last({{dimension_start}}),
-              merged_end_date = dplyr::first(end_date),
-              all_starts = paste({{dimension_start}}, collapse = ", "),
-              all_ends = paste({{dimension_end}}, collapse = ", "),
-              all_funder_service_codes = paste(funder_service_code, collapse = ", "),
-              all_service_names = paste(service_name, collapse = ", "),
-              all_service_status_reasons = paste(service_status_reason, collapse = ", ")) |>
     dplyr::ungroup()
 
 }
@@ -327,7 +292,7 @@ earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, me
     dplyr::summarize(
       merged_start_date = dplyr::first({{dimension_start}}),
       merged_end_date = dplyr::last(end_date),
-      merged_report_date = max(.report_date),
+      merged_report_date = max_or_blank(.report_date),
       all_starts = paste({{dimension_start}}, collapse = ", "),
       all_ends = paste({{dimension_end}}, collapse = ", "),
       all_funder_service_codes = paste(funder_service_code, collapse = ", "),
@@ -369,10 +334,10 @@ count_by_grain <- function(df, grain) {
 sum_by_grain <- function(df, grain, value) {
   df |>
     dplyr::group_by(date, dplyr::across(dplyr::all_of(grain_cols(grain))), funder_statistical_account_code) |>
-    dplyr::summarize(value = {{ value }})
+    dplyr::summarize(value = {{ value }}, .groups = "drop")
 }
 
-# Fiscal year (April to March) as the 4-digit year it starts in
+# Fiscal year (April to March) as the 4-digit year it ends in (2025-04-01 is in "2026")
 fiscal_year <- function(date) {
   lubridate::quarter(date, type = "year.quarter", fiscal_start = 4) |> stringr::str_sub(1, 4)
 }
@@ -383,7 +348,7 @@ min_age_group_by_fiscal_year <- function(df, by = character(0)) {
   df |>
     dplyr::mutate(fiscal_year = fiscal_year(date)) |>
     dplyr::group_by(dplyr::pick(dplyr::all_of(c("participant_id", by, "fiscal_year")))) |>
-    dplyr::mutate(participant_funder_age_group_code = min(participant_funder_age_group_code)) |>
+    dplyr::mutate(participant_funder_age_group_code = min_or_blank(participant_funder_age_group_code)) |>
     dplyr::ungroup()
 }
 
@@ -397,6 +362,12 @@ one_per_person_per_day <- function(df, grain) {
     dplyr::slice(1) |>
     dplyr::ungroup()
 }
+
+# min() and max(), but a blank of the same type for empty input instead of a warning. dplyr
+# evaluates summaries once on empty input when there are no groups (e.g. no clients in any
+# FC that reports a statistic).
+min_or_blank <- function(x) if (length(x) == 0) x[NA_integer_] else min(x)
+max_or_blank <- function(x) if (length(x) == 0) x[NA_integer_] else max(x)
 
 # Earliest date, or NA if there are none (min() would warn and return Inf)
 first_date <- function(dates) {
@@ -458,7 +429,7 @@ number_episodes <- function(service_history) {
     dplyr::mutate(episode = episode_numbers(service_enrollment_id, as.character(service_status))) |>
     dplyr::group_by(service_enrollment_id, episode) |>
     dplyr::mutate(
-      episode_start_date = min(service_status_start_date),
+      episode_start_date = min_or_blank(service_status_start_date),
       episode_decision_date = first_date(service_decision_date[episode == 0 | service_decision_date >= episode_start_date]),
       accepted_date = dplyr::coalesce(
         episode_decision_date,
@@ -489,8 +460,8 @@ drop_same_day_corrections <- function(services) {
   dplyr::anti_join(services, corrected, by = c("service_enrollment_id", "service_status", "service_status_start_date"))
 }
 
-# A warning about the input data. generate_tables() lets these through while it still
-# muffles other warnings, so they always reach the person running it.
+# A warning about the input data, with its own class (generateMIS_data_warning) so callers
+# can pick these out from other warnings.
 data_warning <- function(message) {
   warning(structure(class = c("generateMIS_data_warning", "warning", "condition"),
                     list(message = message, call = NULL)))
