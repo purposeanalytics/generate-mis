@@ -42,15 +42,14 @@ generate_visit_and_service_counts <- function(processed_data,
 
   calc_248 <- mis_visits |>
     filter_eligible("248") |>
-    dplyr::mutate(digits_1_3 = "248",
-                  digits_4_5 = "80",
-                  digits_6_7 = dplyr::case_when(stringr::str_detect(service_sub_service_name, "Hot") ~ "12",
-                                  stringr::str_detect(service_sub_service_name, "Cold") ~ "12",
-                                  stringr::str_detect(service_sub_service_name, "Frozen") ~ "14",
-                                  stringr::str_detect(service_sub_service_name, "Soup") |
-                                    stringr::str_detect(service_sub_service_name, "Dessert") |
-                                    stringr::str_detect(service_sub_service_name, "Side") ~ "16")) |>
-    assemble_statistical_account() |>
+    add_statistical_account(statistic = "248",
+                            sr_category = "80",
+                            detail = dplyr::case_when(stringr::str_detect(service_sub_service_name, "Hot") ~ "12",
+                                                      stringr::str_detect(service_sub_service_name, "Cold") ~ "12",
+                                                      stringr::str_detect(service_sub_service_name, "Frozen") ~ "14",
+                                                      stringr::str_detect(service_sub_service_name, "Soup") |
+                                                        stringr::str_detect(service_sub_service_name, "Dessert") |
+                                                        stringr::str_detect(service_sub_service_name, "Side") ~ "16")) |>
     dplyr::rename(date = activity_date)
 
   report_248 <- function(grain) {
@@ -88,10 +87,9 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(activity_individual_group == "Individual") |>
     # remove indirect and clinical entries
     dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
-    dplyr::mutate(digits_1_3 = "265",
-                  digits_4_5 = default_sr_category(funder_service_code),
-                  digits_6_7 = get_time_intervals(activity_duration)) |>
-    assemble_statistical_account() |>
+    add_statistical_account(statistic = "265",
+                            sr_category = default_sr_category(funder_service_code),
+                            detail = get_time_intervals(activity_duration)) |>
     dplyr::rename(date = activity_date)
 
   report_265 <- function(grain) {
@@ -119,10 +117,9 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::bind_rows(mis_unregistered_interactions) |>
     filter_eligible("266") |>
     dplyr::filter(activity_individual_group =="Group") |>
-    dplyr::mutate(digits_1_3 = "266",
-                  digits_4_5 = "00",
-                  digits_6_7 = get_time_intervals(activity_duration)) |>
-    assemble_statistical_account() |>
+    add_statistical_account(statistic = "266",
+                            sr_category = "00",
+                            detail = get_time_intervals(activity_duration)) |>
     dplyr::rename(date = activity_date)
 
   report_266 <- function(grain) {
@@ -146,10 +143,9 @@ generate_visit_and_service_counts <- function(processed_data,
   report_401 <- function(grain) {
     fc_episodes(calc_401, grain, report_date) |>
       dplyr::filter(!is.na(first_active_date)) |>
-      dplyr::mutate(digits_1_3 = "401",
-                    digits_4_5 = default_sr_category(funder_service_code),
-                    digits_6_7 = participant_funder_age_group_code) |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = "401",
+                              sr_category = default_sr_category(funder_service_code),
+                              detail = participant_funder_age_group_code) |>
       dplyr::rename(date = first_active_date) |>
       count_by_grain(grain)
   }
@@ -184,10 +180,9 @@ generate_visit_and_service_counts <- function(processed_data,
     calc_407 |>
       earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = grain, report_on = service_start_date) |>
       dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
-      dplyr::mutate(digits_1_3 = "407",
-                    digits_4_5 = default_sr_category(funder_service_code),
-                    digits_6_7 = "20") |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = "407",
+                              sr_category = default_sr_category(funder_service_code),
+                              detail = "20") |>
       dplyr::rename(date = merged_report_date) |>
       sum_by_grain(grain, sum(days_waited, na.rm = TRUE))
   }
@@ -217,10 +212,9 @@ generate_visit_and_service_counts <- function(processed_data,
     calc_407_99 |>
       earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = grain) |>
       dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
-      dplyr::mutate(digits_1_3 = "407",
-                    digits_4_5 = "99",
-                    digits_6_7 = "10") |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = "407",
+                              sr_category = "99",
+                              detail = "10") |>
       dplyr::rename(date = merged_end_date) |>
       sum_by_grain(grain, sum(days_waited, na.rm = TRUE))
   }
@@ -262,10 +256,9 @@ generate_visit_and_service_counts <- function(processed_data,
       # reason from the enrollment discharged last
       dplyr::mutate(service_status_reason_code = stringr::str_sub(last_service_status_reason, 1, 2),
                     service_status_reason_code = dplyr::if_else(stringr::str_detect(service_status_reason_code, "^\\d\\d$"), service_status_reason_code, "90", missing = "90")) |>
-      dplyr::mutate(digits_1_3 = dplyr::if_else(funder_service_code %in% css_residential_fcs, "410", "513"),
-                    digits_4_5 = default_sr_category(funder_service_code),
-                    digits_6_7 = dplyr::if_else(funder_service_code %in% css_residential_fcs, participant_funder_age_group_code, service_status_reason_code)) |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = dplyr::if_else(funder_service_code %in% css_residential_fcs, "410", "513"),
+                              sr_category = default_sr_category(funder_service_code),
+                              detail = dplyr::if_else(funder_service_code %in% css_residential_fcs, participant_funder_age_group_code, service_status_reason_code)) |>
       dplyr::rename(date = merged_end_date) |>
       count_by_grain(grain)
   }
@@ -278,10 +271,9 @@ generate_visit_and_service_counts <- function(processed_data,
   report_410_513_cmha <- function(grain) {
     fc_episodes(calc_410_513_cmha, grain, report_date) |>
       dplyr::filter(merged_end_date <= report_date, ever_active) |>
-      dplyr::mutate(digits_1_3 = dplyr::if_else(default_sr_category(funder_service_code) == "45", "410", "513"),
-                    digits_4_5 = default_sr_category(funder_service_code),
-                    digits_6_7 = dplyr::if_else(default_sr_category(funder_service_code) == "45", participant_funder_age_group_code, "90")) |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = dplyr::if_else(default_sr_category(funder_service_code) == "45", "410", "513"),
+                              sr_category = default_sr_category(funder_service_code),
+                              detail = dplyr::if_else(default_sr_category(funder_service_code) == "45", participant_funder_age_group_code, "90")) |>
       dplyr::rename(date = merged_end_date) |>
       count_by_grain(grain)
   }
@@ -327,13 +319,11 @@ generate_visit_and_service_counts <- function(processed_data,
                                               .default = 3)) |>
 
     # assemble statistical account
-    dplyr::mutate(digits_1_3 = dplyr::case_when(activity_type == "Non-face-to-face" ~ "451",
-                                  activity_type %in% c("Face-to-face", "Face-to-face Virtual") ~ "450"),
-                  digits_4_5 = default_sr_category(funder_service_code),
-                  digits_6 = stringr::str_sub(participant_funder_age_group_code, 1, 1),
-                  digits_7 = dplyr::if_else(activity_type == "Face-to-face Virtual", "1", "0"),
-                  digits_6_7 = paste0(digits_6, digits_7)) |>
-    assemble_statistical_account()
+    add_statistical_account(statistic = dplyr::case_when(activity_type == "Non-face-to-face" ~ "451",
+                                                         activity_type %in% c("Face-to-face", "Face-to-face Virtual") ~ "450"),
+                            sr_category = default_sr_category(funder_service_code),
+                            detail = paste0(age_digit(participant_funder_age_group_code),
+                                            dplyr::if_else(activity_type == "Face-to-face Virtual", "1", "0")))
 
   report_450_451_cmha <- function(grain) {
     calc_450_451_cmha |>
@@ -357,13 +347,11 @@ generate_visit_and_service_counts <- function(processed_data,
                     (activity_type == "Assessment" & funder_service_code %in% css_case_management_fcs)) |>
 
     # assemble statistical account (assessments are reported as in-person visits)
-    dplyr::mutate(digits_1_3 = dplyr::case_when(activity_type == "Non-face-to-face" ~ "451",
-                                  activity_type %in% c("Face-to-face", "Face-to-face Virtual", "Assessment") ~ "450"),
-                  digits_4_5 = default_sr_category(funder_service_code),
-                  digits_6 = stringr::str_sub(participant_funder_age_group_code, 1, 1),
-                  digits_7 = dplyr::if_else(activity_type == "Face-to-face Virtual", "1", "0"),
-                  digits_6_7 = paste0(digits_6, digits_7)) |>
-    assemble_statistical_account() |>
+    add_statistical_account(statistic = dplyr::case_when(activity_type == "Non-face-to-face" ~ "451",
+                                                         activity_type %in% c("Face-to-face", "Face-to-face Virtual", "Assessment") ~ "450"),
+                            sr_category = default_sr_category(funder_service_code),
+                            detail = paste0(age_digit(participant_funder_age_group_code),
+                                            dplyr::if_else(activity_type == "Face-to-face Virtual", "1", "0"))) |>
     dplyr::rename(date = activity_date)
 
   report_450_451_css <- function(grain) {
@@ -381,10 +369,9 @@ generate_visit_and_service_counts <- function(processed_data,
     filter_eligible("452") |>
     dplyr::filter(default_sr_category(funder_service_code) == "80") |>
     dplyr::filter(activity_individual_group == "Individual") |>
-    dplyr::mutate(digits_1_3 = "452",
-                  digits_4_5 = dplyr::if_else(funder_service_code %in% info_referral_fcs & ir_version == "verCMHA", "65", "60"),
-                  digits_6_7 = "00") |>
-    assemble_statistical_account() |>
+    add_statistical_account(statistic = "452",
+                            sr_category = dplyr::if_else(funder_service_code %in% info_referral_fcs & ir_version == "verCMHA", "65", "60"),
+                            detail = "00") |>
     dplyr::rename(date = activity_date)
 
   report_452_60_00 <- function(grain) {
@@ -397,10 +384,9 @@ generate_visit_and_service_counts <- function(processed_data,
     filter_eligible("452") |>
     dplyr::filter(default_sr_category(funder_service_code) != "80") |>
     dplyr::filter(activity_individual_group == "Individual") |>
-    dplyr::mutate(digits_1_3 = "452",
-                  digits_4_5 = "65",
-                  digits_6_7 = "00") |>
-    assemble_statistical_account() |>
+    add_statistical_account(statistic = "452",
+                            sr_category = "65",
+                            detail = "00") |>
     dplyr::rename(date = activity_date)
 
   report_452_65_00 <- function(grain) {
@@ -424,13 +410,11 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::filter(stringr::str_detect(activity_type, "ace-to-face")) |>
     # 6th digit = age group; 7th digit = 0 in person, 1 virtual (OHRS Appendix C: 454 ** 21/41/61).
     # There is no virtual account for age not known, so 90 stays 90.
-    dplyr::mutate(digits_1_3 = "454",
-                  digits_4_5 = default_sr_category(funder_service_code),
-                  digits_6_7 = as.character(participant_funder_age_group_code),
-                  digits_6_7 = dplyr::if_else(activity_type == "Face-to-face Virtual" & digits_6_7 != "90",
-                                              paste0(stringr::str_sub(digits_6_7, 1, 1), "1"),
-                                              digits_6_7)) |>
-    assemble_statistical_account() |>
+    add_statistical_account(statistic = "454",
+                            sr_category = default_sr_category(funder_service_code),
+                            detail = dplyr::if_else(activity_type == "Face-to-face Virtual" & participant_funder_age_group_code != "90",
+                                                    paste0(age_digit(participant_funder_age_group_code), "1"),
+                                                    as.character(participant_funder_age_group_code))) |>
     dplyr::rename(date = activity_date) |>
 
     # group sessions: hours are the session length, not length x participants
@@ -488,19 +472,16 @@ generate_visit_and_service_counts <- function(processed_data,
                                               .default = 3)) |>
 
     # assemble statistical account
-    dplyr::mutate(digits_1_3 = dplyr::case_when(activity_type == "Non-face-to-face" ~ "484",
-                                  activity_type %in% c("Face-to-face", "Face-to-face Virtual") ~ "483"),
-                  # pre-admission / post-discharge clients in residential FCs are SR 25
-                  digits_4_5 = dplyr::if_else(default_sr_category(funder_service_code) == "45", "25", default_sr_category(funder_service_code)),
-                  digits_6 = stringr::str_sub(participant_funder_age_group_code, 1, 1),
-                  digits_7 = dplyr::case_when(
-                                activity_type == "Face-to-face" ~ 1,
-                                activity_type == "Face-to-face Virtual" ~ 3,
-                                activity_type == "Non-face-to-face" ~ 0,
-                                activity_individual_group == "Group" ~ 1,
-                                .default = 0),
-                  digits_6_7 = paste0(digits_6, digits_7)) |>
-    assemble_statistical_account() |>
+    add_statistical_account(statistic = dplyr::case_when(activity_type == "Non-face-to-face" ~ "484",
+                                                         activity_type %in% c("Face-to-face", "Face-to-face Virtual") ~ "483"),
+                            # pre-admission / post-discharge clients in residential FCs are SR 25
+                            sr_category = dplyr::if_else(default_sr_category(funder_service_code) == "45", "25", default_sr_category(funder_service_code)),
+                            detail = paste0(age_digit(participant_funder_age_group_code),
+                                            dplyr::case_when(activity_type == "Face-to-face" ~ "1",
+                                                             activity_type == "Face-to-face Virtual" ~ "3",
+                                                             activity_type == "Non-face-to-face" ~ "0",
+                                                             activity_individual_group == "Group" ~ "1",
+                                                             .default = "0"))) |>
     dplyr::rename(date = activity_date)
 
 
@@ -529,10 +510,9 @@ generate_visit_and_service_counts <- function(processed_data,
     fc_episodes(calc_489, grain, report_date) |>
       # a referral needs an eligibility decision date (see number_episodes())
       dplyr::filter(!is.na(episode_decision_date)) |>
-      dplyr::mutate(digits_1_3 = "489",
-                    digits_4_5 = default_sr_category(funder_service_code),
-                    digits_6_7 = participant_funder_age_group_code) |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = "489",
+                              sr_category = default_sr_category(funder_service_code),
+                              detail = participant_funder_age_group_code) |>
       dplyr::rename(date = episode_decision_date) |>
       count_by_grain(grain)
   }
@@ -552,10 +532,9 @@ generate_visit_and_service_counts <- function(processed_data,
     filter_eligible("491") |>
     dplyr::filter(default_sr_category(funder_service_code) == "80") |>
     dplyr::filter(activity_individual_group == "Group") |>
-    dplyr::mutate(digits_1_3 = "491",
-                  digits_4_5 = dplyr::if_else(funder_service_code %in% info_referral_fcs & ir_version == "verCMHA", "65", "60"),
-                  digits_6_7 = "10") |>
-    assemble_statistical_account() |>
+    add_statistical_account(statistic = "491",
+                            sr_category = dplyr::if_else(funder_service_code %in% info_referral_fcs & ir_version == "verCMHA", "65", "60"),
+                            detail = "10") |>
     dplyr::rename(date = activity_date)
 
   report_491_60_10 <- function(grain) {
@@ -568,10 +547,9 @@ generate_visit_and_service_counts <- function(processed_data,
     filter_eligible("491") |>
     dplyr::filter(default_sr_category(funder_service_code) != "80") |>
     dplyr::filter(activity_individual_group == "Group") |>
-    dplyr::mutate(digits_1_3 = "491",
-                  digits_4_5 = "65",
-                  digits_6_7 = "10") |>
-    assemble_statistical_account() |>
+    add_statistical_account(statistic = "491",
+                            sr_category = "65",
+                            detail = "10") |>
     dplyr::rename(date = activity_date)
 
   report_491_65_10 <- function(grain) {
@@ -591,10 +569,9 @@ generate_visit_and_service_counts <- function(processed_data,
   calc_491 <- mis_visits |>
     filter_eligible("491") |>
     dplyr::filter(activity_individual_group == "Group") |>
-    dplyr::mutate(digits_1_3 = "491",
-                  digits_4_5 = default_sr_category(funder_service_code),
-                  digits_6_7 = "20") |>
-    assemble_statistical_account() |>
+    add_statistical_account(statistic = "491",
+                            sr_category = default_sr_category(funder_service_code),
+                            detail = "20") |>
     dplyr::rename(date = activity_date)
 
   report_491 <- function(grain) {
@@ -675,10 +652,9 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::mutate(funder_service_code = "82 9 90") |>
 
     # assemble funder_statistical_account_code
-    dplyr::mutate(digits_1_3 = "501",
-                  digits_4_5 = sr_code,
-                  digits_6_7 = participant_funder_age_group_code) |>
-    assemble_statistical_account() |>
+    add_statistical_account(statistic = "501",
+                            sr_category = sr_code,
+                            detail = participant_funder_age_group_code) |>
     dplyr::count(date, funder_service_code, funder_statistical_account_code, name = "value")
 
 
@@ -707,10 +683,9 @@ generate_visit_and_service_counts <- function(processed_data,
         dplyr::filter(!is.na(first_active_date), first_active_date >= dashboard_start_date) |>
         dplyr::left_join(age_on_day, by = c("participant_id", "first_active_date" = "date")) |>
         dplyr::mutate(participant_funder_age_group_code = dplyr::coalesce(age_group_on_day, participant_funder_age_group_code)) |>
-        dplyr::mutate(digits_1_3 = "506",
-                      digits_4_5 = default_sr_category(funder_service_code),
-                      digits_6_7 = participant_funder_age_group_code) |>
-        assemble_statistical_account() |>
+        add_statistical_account(statistic = "506",
+                                sr_category = default_sr_category(funder_service_code),
+                                detail = participant_funder_age_group_code) |>
         dplyr::rename(date = first_active_date) |>
         count_by_grain(grain)
     }
@@ -726,10 +701,9 @@ generate_visit_and_service_counts <- function(processed_data,
       calc_506 |>
         merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = grain) |>
         dplyr::distinct(dplyr::pick(dplyr::all_of(c("participant_id", "participant_funder_age_group_code", "service_first_direct_activity", grain_cols(grain))))) |>
-        dplyr::mutate(digits_1_3 = "506",
-                      digits_4_5 = default_sr_category(funder_service_code),
-                      digits_6_7 = participant_funder_age_group_code) |>
-        assemble_statistical_account() |>
+        add_statistical_account(statistic = "506",
+                                sr_category = default_sr_category(funder_service_code),
+                                detail = participant_funder_age_group_code) |>
         dplyr::rename(date = service_first_direct_activity) |>
         count_by_grain(grain)
     }
@@ -749,13 +723,12 @@ generate_visit_and_service_counts <- function(processed_data,
   calc_511 <- org_involvement |>
     dplyr::filter(merged_end_date <= report_date) |>
     dplyr::mutate(service_status_reason_code = stringr::str_sub(last_service_status_reason, 1, 2),
-                  funder_service_code = "82 9 90",
-                  digits_1_3 = "511",
-                  digits_4_5 = sr_code,
-                  # CSS reports the discharge reason; CMH&A reports 90 (OHRS Ch. 7: S511 ** 90)
-                  digits_6_7 = dplyr::case_when(sr_code == "80" & stringr::str_detect(service_status_reason_code, "^\\d\\d$") ~ service_status_reason_code,
-                                                .default = "90")) |>
-    assemble_statistical_account() |>
+                  funder_service_code = "82 9 90") |>
+    add_statistical_account(statistic = "511",
+                            sr_category = sr_code,
+                            # CSS reports the discharge reason; CMH&A reports 90 (OHRS Ch. 7: S511 ** 90)
+                            detail = dplyr::case_when(sr_code == "80" & stringr::str_detect(service_status_reason_code, "^\\d\\d$") ~ service_status_reason_code,
+                                                      .default = "90")) |>
     dplyr::rename(date = merged_end_date)
 
   ## CSS version with discharge reason
@@ -792,16 +765,15 @@ generate_visit_and_service_counts <- function(processed_data,
     mis_visits |>
       filter_eligible("512") |>
       dplyr::filter(stringr::str_detect(activity_assessment, "Assessment Complete/Outcome")) |>
-      dplyr::mutate(digits_1_3 = "512",
-                    digits_4_5 = default_sr_category(funder_service_code),
-                    digits_6_7 = dplyr::case_when(stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Client Declined") ~ "11",
-                                           stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Admitted") ~ "12",
-                                           stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Adult Day") ~ "21",
-                                           stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Supportive Housing") ~ "22",
-                                           stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Enhanced Respite") ~ "23",
-                                           stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Other Organizations") ~ "29",
-                                           .default = "12")) |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = "512",
+                              sr_category = default_sr_category(funder_service_code),
+                              detail = dplyr::case_when(stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Client Declined") ~ "11",
+                                                        stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Admitted") ~ "12",
+                                                        stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Adult Day") ~ "21",
+                                                        stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Supportive Housing") ~ "22",
+                                                        stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible – Enhanced Respite") ~ "23",
+                                                        stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Other Organizations") ~ "29",
+                                                        .default = "12")) |>
       dplyr::rename(date = activity_date) |>
       count_by_grain(grain)
   }

@@ -50,10 +50,9 @@ generate_census_counts <- function(processed_data,
       filter_eligible("403") |>
       dplyr::filter(service_status == "Active") |>
       dplyr::distinct(dplyr::pick(dplyr::all_of(c("participant_id", "participant_funder_age_group_code", grain_cols(grain), "date")))) |>
-      dplyr::mutate(digits_1_3 = "403",
-                    digits_4_5 = default_sr_category(funder_service_code),
-                    digits_6_7 = participant_funder_age_group_code) |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = "403",
+                              sr_category = default_sr_category(funder_service_code),
+                              detail = participant_funder_age_group_code) |>
       count_by_grain(grain)
   }
 
@@ -71,10 +70,9 @@ generate_census_counts <- function(processed_data,
       # exclude first day of wait where duration is zero -- only count on waitlist if they wait one day or more
       dplyr::filter(service_status_start_date != date) |>
       dplyr::distinct(dplyr::pick(dplyr::all_of(c("date", "participant_id", grain_cols(grain), "service_status")))) |>
-      dplyr::mutate(digits_1_3 = "406",
-                    digits_4_5 = default_sr_category(funder_service_code),
-                    digits_6_7 = "20") |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = "406",
+                              sr_category = default_sr_category(funder_service_code),
+                              detail = "20") |>
       count_by_grain(grain)
   }
 
@@ -95,10 +93,9 @@ generate_census_counts <- function(processed_data,
       # exclude first day of wait where duration is zero -- only count as waiting for assessment if they wait one day or more
       dplyr::filter(service_status_start_date != date) |>
       dplyr::distinct(dplyr::pick(dplyr::all_of(c("date", "participant_id", grain_cols(grain), "service_status")))) |>
-      dplyr::mutate(digits_1_3 = "406",
-                    digits_4_5 = "99",
-                    digits_6_7 = "10") |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = "406",
+                              sr_category = "99",
+                              detail = "10") |>
       count_by_grain(grain)
   }
 
@@ -150,10 +147,9 @@ generate_census_counts <- function(processed_data,
                 keep = function(df) filter_eligible(df, "455"),
                 match_on = keys) |>
       min_age_group_by_fiscal_year(by = keys) |>
-      dplyr::mutate(digits_1_3 = "455",
-                    digits_4_5 = default_sr_category(funder_service_code),
-                    digits_6_7 = participant_funder_age_group_code) |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = "455",
+                              sr_category = default_sr_category(funder_service_code),
+                              detail = participant_funder_age_group_code) |>
       dplyr::select(date, dplyr::all_of(keys), funder_statistical_account_code, participant_id)
   }
 
@@ -173,11 +169,10 @@ generate_census_counts <- function(processed_data,
   calc_org_855_css <- served_days("participant_funder_age_group_code",
                                   keep = function(df) dplyr::filter(df, default_sr_category(funder_service_code) == "80")) |>
     min_age_group_by_fiscal_year() |>
-    dplyr::mutate(funder_service_code = "82 9 90",
-                  digits_1_3 = "855",
-                  digits_4_5 = "80",
-                  digits_6_7 = paste0("5", stringr::str_sub(participant_funder_age_group_code, 1, 1))) |>
-    assemble_statistical_account() |>
+    dplyr::mutate(funder_service_code = "82 9 90") |>
+    add_statistical_account(statistic = "855",
+                            sr_category = "80",
+                            detail = paste0("5", age_digit(participant_funder_age_group_code))) |>
     dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
 
   # CMH&A: one count per fund type, in the organizational AC for that fund type (AC 82 9 90, 83 9 90)
@@ -185,11 +180,10 @@ generate_census_counts <- function(processed_data,
                                    keep = function(df) dplyr::filter(df, default_sr_category(funder_service_code) != "80"),
                                    match_on = "fund_type") |>
     min_age_group_by_fiscal_year(by = "fund_type") |>
-    dplyr::mutate(funder_service_code = paste0("8", fund_type, " 9 90"),
-                  digits_1_3 = "855",
-                  digits_4_5 = "25",
-                  digits_6_7 = paste0("5", stringr::str_sub(participant_funder_age_group_code, 1, 1))) |>
-    assemble_statistical_account() |>
+    dplyr::mutate(funder_service_code = paste0("8", fund_type, " 9 90")) |>
+    add_statistical_account(statistic = "855",
+                            sr_category = "25",
+                            detail = paste0("5", age_digit(participant_funder_age_group_code))) |>
     dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
 
 
@@ -210,21 +204,19 @@ generate_census_counts <- function(processed_data,
 
   # Organization: S950 10 80 in AC 82 9 90; under verA the visit can be in any FC
   calc_org_950_10 <- served_days(character(0), keep = keep_950) |>
-    dplyr::mutate(funder_service_code = "82 9 90",
-                  digits_1_3 = "950",
-                  digits_4_5 = "10",
-                  digits_6_7 = "80") |>
-    assemble_statistical_account() |>
+    dplyr::mutate(funder_service_code = "82 9 90") |>
+    add_statistical_account(statistic = "950",
+                            sr_category = "10",
+                            detail = "80") |>
     dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
 
   # Functional centre: S950 80 10
   calc_950 <- function(grain) {
     keys <- grain_cols(grain)
     served_days(keys, keep = keep_950, match_on = keys) |>
-      dplyr::mutate(digits_1_3 = "950",
-                    digits_4_5 = "80",
-                    digits_6_7 = "10") |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = "950",
+                              sr_category = "80",
+                              detail = "10") |>
       dplyr::select(date, dplyr::all_of(keys), funder_statistical_account_code, participant_id)
   }
 
@@ -253,14 +245,13 @@ generate_census_counts <- function(processed_data,
     served_days(c(keys, "participant_ohrs_special_needs"),
                 keep = function(df) df |> filter_eligible("955") |> dplyr::filter(!is.na(participant_ohrs_special_needs)),
                 match_on = keys) |>
-      dplyr::mutate(digits_1_3 = "955",
-                    digits_4_5 = default_sr_category(funder_service_code),
-                    digits_6_7 = dplyr::case_when(participant_ohrs_special_needs == "Physical Disability" ~ "10",
-                                                  participant_ohrs_special_needs == "Cognitive Impairment" ~ "15",
-                                                  participant_ohrs_special_needs == "Frail And-or Elderly" ~ "20",
-                                                  participant_ohrs_special_needs == "High Risk Senior" ~ "22",
-                                                  participant_ohrs_special_needs == "Living With Effects Of HIV-AIDS" ~ "25")) |>
-      assemble_statistical_account() |>
+      add_statistical_account(statistic = "955",
+                              sr_category = default_sr_category(funder_service_code),
+                              detail = dplyr::case_when(participant_ohrs_special_needs == "Physical Disability" ~ "10",
+                                                        participant_ohrs_special_needs == "Cognitive Impairment" ~ "15",
+                                                        participant_ohrs_special_needs == "Frail And-or Elderly" ~ "20",
+                                                        participant_ohrs_special_needs == "High Risk Senior" ~ "22",
+                                                        participant_ohrs_special_needs == "Living With Effects Of HIV-AIDS" ~ "25")) |>
       dplyr::select(date, dplyr::all_of(keys), funder_statistical_account_code, participant_id)
   }
 

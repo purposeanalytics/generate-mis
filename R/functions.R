@@ -200,28 +200,37 @@ get_time_intervals <- function(activity_duration){
 }
 
 
-# Build funder_statistical_account_code ("ddd dd dd") from digits_1_3 (statistic),
-# digits_4_5 (SR category) and digits_6_7 (detail, e.g. age group or reason), then drop the
-# helper columns. A part with the wrong number of digits is a bug in the statistic, so the
-# run stops. A blank part (e.g. an unmapped meal type) comes from the data: the row is kept
-# and a data warning names the account, which can't be reported as it stands.
-assemble_statistical_account <- function(df) {
-  widths <- c(digits_1_3 = 3, digits_4_5 = 2, digits_6_7 = 2)
-  blank <- rep(FALSE, nrow(df))
+# Add funder_statistical_account_code ("ddd dd dd") from its three parts, each a column
+# expression evaluated in `df` (as in dplyr::mutate()):
+# - statistic: the 3-digit statistic, e.g. "506"
+# - sr_category: the 2-digit service recipient category, usually default_sr_category()
+# - detail: the last 2 digits, e.g. age group, reason or time interval
+# A part with the wrong number of digits is a bug in the statistic, so the run stops. A blank
+# part (e.g. an unmapped meal type) comes from the data: the row is kept and a data warning
+# names the account, which can't be reported as it stands.
+add_statistical_account <- function(df, statistic, sr_category, detail) {
+  df <- dplyr::mutate(df,
+                      .statistic = as.character({{ statistic }}),
+                      .sr_category = as.character({{ sr_category }}),
+                      .detail = as.character({{ detail }}))
 
-  for (col in names(widths)) {
-    part <- as.character(df[[col]])
+  widths <- c(statistic = 3, sr_category = 2, detail = 2)
+  blank <- rep(FALSE, nrow(df))
+  for (part_name in names(widths)) {
+    part <- df[[paste0(".", part_name)]]
     # a blank pasted into a part (paste0(NA, "1")) reads as "NA..."
     part_blank <- is.na(part) | grepl("NA", part, fixed = TRUE)
-    wrong <- !part_blank & !grepl(paste0("^[0-9]{", widths[[col]], "}$"), part)
+    wrong <- !part_blank & !grepl(paste0("^[0-9]{", widths[[part_name]], "}$"), part)
     if (any(wrong)) {
-      stop(glue::glue("{col} must be {widths[[col]]} digits; got {paste(unique(part[wrong]), collapse = ', ')}"),
+      stop(glue::glue("{part_name} must be {widths[[part_name]]} digits; got {paste(unique(part[wrong]), collapse = ', ')}"),
            call. = FALSE)
     }
     blank <- blank | part_blank
   }
 
-  df <- dplyr::mutate(df, funder_statistical_account_code = paste(digits_1_3, digits_4_5, digits_6_7))
+  df <- df |>
+    dplyr::mutate(funder_statistical_account_code = paste(.statistic, .sr_category, .detail)) |>
+    dplyr::select(-.statistic, -.sr_category, -.detail)
 
   if (any(blank)) {
     accounts <- unique(df$funder_statistical_account_code[blank])
@@ -230,7 +239,13 @@ assemble_statistical_account <- function(df) {
                             "as they stand. Check the input columns the statistic uses."))
   }
 
-  dplyr::select(df, -dplyr::any_of(c("digits_1_3", "digits_4_5", "digits_6_7", "digits_6", "digits_7")))
+  df
+}
+
+# First digit of an age group code (20, 40, 60, 90), for accounts that pair it with another
+# digit (e.g. S450 ** 41 = adult, virtual)
+age_digit <- function(age_group_code) {
+  stringr::str_sub(age_group_code, 1, 1)
 }
 
 # Warn about FC/account pairs in an output table that aren't in the OHRS code table

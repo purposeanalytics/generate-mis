@@ -5,17 +5,27 @@ test_that("default_sr_category() gives the FC's usual SR category", {
                c("45", "25", "25", "25", "80"))
 })
 
-test_that("an account part with the wrong number of digits stops the run", {
-  parts <- tibble::tibble(digits_1_3 = "45", digits_4_5 = "25", digits_6_7 = "40")
-  expect_error(assemble_statistical_account(parts), "digits_1_3 must be 3 digits; got 45", fixed = TRUE)
+test_that("add_statistical_account() builds the account from its parts", {
+  rows <- tibble::tibble(funder_service_code = c(mh_fc, ps_fc), participant_funder_age_group_code = c("40", "20"))
+  out <- add_statistical_account(rows, statistic = "506",
+                                 sr_category = default_sr_category(funder_service_code),
+                                 detail = participant_funder_age_group_code)
+  expect_equal(out$funder_statistical_account_code, c("506 25 40", "506 80 20"))
+  # no helper columns are left behind
+  expect_equal(colnames(out), c(colnames(rows), "funder_statistical_account_code"))
 })
 
-test_that("a blank account part is kept with a data warning, and the helper columns are dropped", {
-  parts <- tibble::tibble(digits_1_3 = "248", digits_4_5 = "80", digits_6_7 = c("20", NA))
-  expect_warning(out <- assemble_statistical_account(parts), "(248 80 NA)", fixed = TRUE,
-                 class = "generateMIS_data_warning")
+test_that("an account part with the wrong number of digits stops the run", {
+  rows <- tibble::tibble(x = 1)
+  expect_error(add_statistical_account(rows, statistic = "45", sr_category = "25", detail = "40"),
+               "statistic must be 3 digits; got 45", fixed = TRUE)
+})
+
+test_that("a blank account part is kept with a data warning", {
+  rows <- tibble::tibble(meal = c("20", NA))
+  expect_warning(out <- add_statistical_account(rows, statistic = "248", sr_category = "80", detail = meal),
+                 "(248 80 NA)", fixed = TRUE, class = "generateMIS_data_warning")
   expect_equal(out$funder_statistical_account_code, c("248 80 20", "248 80 NA"))
-  expect_equal(colnames(out), "funder_statistical_account_code")
 })
 
 test_that("check_accounts() warns about pairs that aren't in the OHRS code table", {
