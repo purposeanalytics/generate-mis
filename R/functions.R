@@ -461,11 +461,14 @@ first_date <- function(dates) {
 #   that day and carries on past it, was a correction (the client went straight back to
 #   waiting) and is dropped before episodes are numbered: see drop_same_day_corrections().
 #   This uses the status end dates as recorded in services.rds.
-# - episode_decision_date is the eligibility decision date for the episode. A decision date
-#   from before a reopened episode began belongs to an earlier episode. S489 needs one: an
-#   episode with no decision date has no referral counted, and process_data() warns about it:
-#   data prep should supply a decision date whenever a client is moved to Waitlist, Hold or
-#   Active, so a missing one is an error in the source data.
+# - episode_decision_date is the eligibility decision date for the episode, and the date
+#   its referral (S489) is counted on. A decision date from before a later episode began
+#   belongs to an earlier episode. Source systems (e.g. AlayaCare) don't record a new decision
+#   when a client goes back on the waitlist or a file is reopened, so a later episode with no
+#   decision date of its own is referred on the day it reaches Waitlist, Hold or Active
+#   (OHRS Ch. 10, 10.9.4.4 example 2 counts the new referral when the client resumes waiting).
+#   A first episode still needs a real decision date: without one no referral is counted, and
+#   process_data() warns about it as an error in the source data.
 # - accepted_date is when the FC took responsibility: the decision date, or if there is none,
 #   the first Waitlist, Hold or Active date. It is used to merge episodes and for S501/S511.
 # - Overlapping episodes in the same FC (or service) are merged into one, so a person has one
@@ -498,15 +501,16 @@ number_episodes <- function(service_history) {
     dplyr::mutate(
       episode_start_date = min_or_blank(service_status_start_date),
       episode_decision_date = first_date(service_decision_date[episode == 0 | service_decision_date >= episode_start_date]),
-      accepted_date = dplyr::coalesce(
-        episode_decision_date,
-        first_date(service_status_start_date[service_status %in% c("On Waitlist", "On Hold", "Active")]),
-        episode_start_date),
+      first_accepted_status_date = first_date(service_status_start_date[service_status %in% c("On Waitlist", "On Hold", "Active")]),
+      # a later episode with no decision of its own is referred when it reaches Waitlist, Hold or Active
+      episode_decision_date = dplyr::if_else(episode > 0 & is.na(episode_decision_date),
+                                             first_accepted_status_date, episode_decision_date),
+      accepted_date = dplyr::coalesce(episode_decision_date, first_accepted_status_date, episode_start_date),
       # discharge reason, from the Inactive status that ended the episode (none if the client
       # went back to the waitlist)
       episode_discharge_reason = dplyr::last(service_status_reason[service_status == "Inactive"])) |>
     dplyr::ungroup() |>
-    dplyr::select(-episode_start_date)
+    dplyr::select(-episode_start_date, -first_accepted_status_date)
 }
 
 # Drop Active statuses that were corrected the same day: the Active starts and ends on the
@@ -563,6 +567,8 @@ drop_unusable_statuses <- function(services) {
 }
 
 # Warn about episodes that reached Waitlist, Hold or Active with no eligibility decision date.
+# Only a first episode can be missing one: later episodes fall back to the day they reached
+# Waitlist, Hold or Active (see number_episodes()).
 # These have no referral (S489) but can still have a first service (S506/S401), so the
 # counts won't pair up until the source data is corrected.
 warn_missing_decision_dates <- function(service_history) {

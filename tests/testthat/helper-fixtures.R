@@ -119,18 +119,20 @@ fixture_services <- function() {
     status("R1", "E13", act_fc, "Active",  "2025-04-07", decision = "2025-04-07"),
     status("R1", "E13", act_fc, "On Hold", "2025-05-05", decision = "2025-04-07"),
     status("R1", "E13", act_fc, "Active",  "2025-06-16", decision = "2025-04-07"),
-    # R2: discharged, then the file reopened: two episodes
+    # R2: discharged, then the file reopened: two episodes. As in AlayaCare, the reopened file
+    #   keeps the original decision date, so the second referral falls back to Jul 7.
     status("R2", "E14", act_fc, "On Waitlist", "2025-04-14", decision = "2025-04-14"),
     status("R2", "E14", act_fc, "Active",      "2025-05-12", decision = "2025-04-14"),
     status("R2", "E14", act_fc, "Inactive",    "2025-06-09", decision = "2025-04-14", reason = "10 - Goals met"),
-    status("R2", "E14", act_fc, "On Waitlist", "2025-07-07", decision = "2025-07-07"),
-    status("R2", "E14", act_fc, "Active",      "2025-08-04", decision = "2025-07-07"),
+    status("R2", "E14", act_fc, "On Waitlist", "2025-07-07", decision = "2025-04-14"),
+    status("R2", "E14", act_fc, "Active",      "2025-08-04", decision = "2025-04-14"),
     # R3: back on the waitlist after service started: discharged, then a new episode
-    #   (OHRS Ch. 10, 10.9.4.4 example 2)
+    #   (OHRS Ch. 10, 10.9.4.4 example 2). No new decision date is recorded, so the second
+    #   referral falls back to the return to the waitlist on Jun 23.
     status("R3", "E15", act_fc, "On Waitlist", "2025-04-21", decision = "2025-04-21"),
     status("R3", "E15", act_fc, "Active",      "2025-05-19", decision = "2025-04-21"),
-    status("R3", "E15", act_fc, "On Waitlist", "2025-06-23", decision = "2025-06-23"),
-    status("R3", "E15", act_fc, "Active",      "2025-07-21", decision = "2025-06-23"),
+    status("R3", "E15", act_fc, "On Waitlist", "2025-06-23", decision = "2025-04-21"),
+    status("R3", "E15", act_fc, "Active",      "2025-07-21", decision = "2025-04-21"),
     # R4: no decision date (an error in the source data): warned about, no referral (S489),
     #   but the service that started is still counted
     status("R4", "E16", act_fc, "On Waitlist", "2025-04-28"),

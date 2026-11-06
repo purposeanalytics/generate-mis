@@ -11,7 +11,8 @@ test_that("service that pauses and resumes is one episode: one referral, one fir
 
 test_that("a file reopened after Inactive is a new episode with its own referral, wait, first service and discharge", {
   fc <- run_mis()$mis_visit_and_service_counts_by_fc
-  # R2: Waitlist Apr 14, Active May 12, Inactive Jun 9, Waitlist Jul 7, Active Aug 4
+  # R2: Waitlist Apr 14, Active May 12, Inactive Jun 9, Waitlist Jul 7, Active Aug 4.
+  #   Only the Apr 14 decision is recorded; the reopened episode is referred on Jul 7.
   expect_equal(value_on(fc, act_fc, "489 25 40", "2025-04-14"), 1)
   expect_equal(value_on(fc, act_fc, "489 25 40", "2025-07-07"), 1)
   expect_equal(value_on(fc, act_fc, "506 25 40", "2025-05-12"), 1)
@@ -32,7 +33,8 @@ test_that("a return to the waitlist after service started is a discharge and a n
   expect_equal(value_on(fc, act_fc, "489 25 40", "2025-04-21"), 1)
   expect_equal(value_on(fc, act_fc, "506 25 40", "2025-05-19"), 1)
   expect_equal(value_on(fc, act_fc, "407 25 20", "2025-05-19"), 28)
-  # discharged and referred again on Jun 23, then a second wait and first service
+  # discharged and referred again on Jun 23 (no new decision date: the return to the
+  # waitlist is the referral date), then a second wait and first service
   expect_equal(value_on(fc, act_fc, "513 25 90", "2025-06-23"), 1)
   expect_equal(value_on(fc, act_fc, "489 25 40", "2025-06-23"), 1)
   expect_equal(value_on(fc, act_fc, "506 25 40", "2025-07-21"), 1)
