@@ -44,8 +44,9 @@ generate_census_counts <- function(processed_data,
   # Age category breakdown and service recipient category are required.  The service recipient (SR) category 45 and 44 (as noted in the 4th and 5th digits of the account number above).
   # Note:  S403 4* *0 Resident Days, must be reported for all residential services functional centres 7* 5 40 ** **, except the Supportive Housing functional centres (refer to section 7.6.8 for the list of Supportive Housing functional centres).  There is a mandatory edit rule for trial balance submission process to ensure this statistic is reported.
 
+  rlog::log_info("Generating S403 statistic")
+
   calc_403 <- function(grain) {
-    rlog::log_info(glue::glue("Generating S403 statistic by {grain}"))
     mis_daily_census |>
       filter_eligible("403") |>
       dplyr::filter(service_status == "Active") |>
@@ -61,8 +62,9 @@ generate_census_counts <- function(processed_data,
   #The number of individuals waiting for service from a specific functional centre.  These individuals are eligible for service but have not yet had their first service and thus are still waiting for service.  This statistic is recorded in the client/service functional centre.  This reflects the number on the waiting list on the last day of reporting period.  Service Recipient Category required.  This is a snapshot at a specific point in time as at September 30 (Q2), December 31 (Q3), and March 31 (Year End).  It is not a cumulative number at Year End.
   #The S406**20 does not include individuals who are waiting, when the service is available to the service recipient but the individual requests to delay initiation of service.
 
+  rlog::log_info("Generating S406 statistic")
+
   calc_406 <- function(grain) {
-    rlog::log_info(glue::glue("Generating S406 statistic by {grain}"))
     mis_daily_census |>
       filter_eligible("406") |>
       # participants who were on the waitlist at the end of the reporting period
@@ -84,8 +86,9 @@ generate_census_counts <- function(processed_data,
   # This is a snapshot at a specific point in time as at September 30 (Q2), December 31 (Q3), and March 31 (Year End).
   # It is not a cumulative number at Year End.
 
+  rlog::log_info("Generating S406 99 statistic")
+
   calc_406_99 <- function(grain) {
-    rlog::log_info(glue::glue("Generating S406 99 statistic by {grain}"))
     mis_daily_census |>
       filter_eligible("406 99") |>
       # filter participants who were pending assessment at the end of the reporting period
@@ -141,8 +144,9 @@ generate_census_counts <- function(processed_data,
   # Note: All the S455* counts in the various functional centres cannot be added together to calculate a total for the whole organization.  See S855**76 for a total unique count of the Total Individuals Served by the Organization.
   # Note: the number of individuals reported using account S455****, Individuals Served by Functional Centre, within a functional centre cannot be greater than the number individuals served by the organization in account S855**76.
 
+  rlog::log_info("Generating S455 statistic")
+
   calc_455 <- function(grain) {
-    rlog::log_info(glue::glue("Generating S455 statistic by {grain}"))
     keys <- grain_cols(grain)
     served_days(c(keys, "participant_funder_age_group_code"),
                 keep = function(df) filter_eligible(df, "455"),
@@ -240,8 +244,9 @@ generate_census_counts <- function(processed_data,
   # S955 80 22 High Risk Senior is mandatory reporting for FC 725 82 45 Assisted Living Services.
 
   # S955 is a breakdown of S455 80 ** and is reported in the same FC (OHRS Ch. 10, 10.9.4.8), not AC 82 9 90
+  rlog::log_info("Generating S955 statistic")
+
   calc_955 <- function(grain) {
-    rlog::log_info(glue::glue("Generating S955 statistic by {grain}"))
     keys <- grain_cols(grain)
     served_days(c(keys, "participant_ohrs_special_needs"),
                 # only FCs with the special-needs breakdown; some (e.g. 72 5 82 12) only have the S955 initiative accounts
@@ -267,7 +272,7 @@ generate_census_counts <- function(processed_data,
 
   # Write mis_census_counts_by_fc to file ----
 
-  rlog::log_info("Writing census-type statistics files")
+  rlog::log_info("Writing mis_census_counts_by_fc.csv")
 
   mis_census_counts_by_fc <- dplyr::bind_rows(calc_403("fc"), calc_406("fc"), calc_406_99("fc"), calc_455("fc"),
                                               calc_org_855_css, calc_org_855_cmha, calc_org_950_10,
@@ -277,6 +282,7 @@ generate_census_counts <- function(processed_data,
   check_accounts(mis_census_counts_by_fc, "mis_census_counts_by_fc")
   readr::write_csv(mis_census_counts_by_fc, paste0(data_folder, "/processed/mis_census_counts_by_fc.csv"), na = "")
 
+  rlog::log_info("Writing mis_census_counts_by_service.csv")
 
   mis_census_counts_by_service <- dplyr::bind_rows(calc_403("service"), calc_406("service"), calc_406_99("service"),
                                                    calc_455("service"), calc_950("service"), calc_955("service")) |>

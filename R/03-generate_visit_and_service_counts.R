@@ -237,7 +237,7 @@ generate_visit_and_service_counts <- function(processed_data,
   # Reported instead of S410 in the CSS residential FCs when the client died while in their care
   # (S410 counts live discharges only). OHRS Ch. 10, 10.9.4.3.3.
 
-  rlog::log_info("Generating S410, S411 & S513 statistic")
+  rlog::log_info("Generating S410, S411 and S513 statistics")
 
   ## CSS residential FCs report S410 (or S411 for a death) instead of S513
   ## (OHRS Ch. 10, 10.9.4.3.3: 7* 5 82 40, 7* 5 82 45, 7* 5 83 45)
@@ -310,7 +310,7 @@ generate_visit_and_service_counts <- function(processed_data,
   # If a SR is present in person as well as non face to face to receive service for the same need on the same calendar day, report 1 face to face in person visit regardless of which occurred first.
 
 
-  rlog::log_info("Generating S450 & S451 statistic")
+  rlog::log_info("Generating S450 and S451 statistics")
 
   calc_450_451_cmha <- mis_visits |>
     filter_eligible("450|451") |>
@@ -371,7 +371,7 @@ generate_visit_and_service_counts <- function(processed_data,
   # S452 60 00 Not Uniquely Identified Service Recipient Interactions ----
   # The number of interactions face to face, or non - face to face with a service recipient/client or significant other who is not uniquely identified. This statistic is used when a health record or unique identifier has not been generated and/or there is no documentation according to the health care organization’s policy.  Only service recipient codes 60 and 65 can be used with this account.  Examples of functional centres where this account can be used are Education (7* 8), Health Promotion and Education (7* 5 50) and Information & Referral (7* 5 70).
 
-  rlog::log_info("Generating S452 60 00 & S452 65 00 statistic")
+  rlog::log_info("Generating S452 60 00 and S452 65 00 statistics")
 
   calc_452_60_00 <- mis_unregistered_interactions |>
     filter_eligible("452") |>
@@ -459,7 +459,7 @@ generate_visit_and_service_counts <- function(processed_data,
   # Attendance days there are only for clients before admission or after discharge,
   # and are reported under SR 25 (OHRS Ch 7 s7.7.3.1), so S483 45 / S484 45 never exist.
 
-  rlog::log_info("Generating S483 & S484 statistic")
+  rlog::log_info("Generating S483 and S484 statistics")
 
   resident_days <- mis_daily_census |>
     dplyr::filter(service_status == "Active", default_sr_category(funder_service_code) == "45") |>
@@ -534,7 +534,7 @@ generate_visit_and_service_counts <- function(processed_data,
   #Note: Not Uniquely Identified Service Recipients participating in group sessions are not reported in S455 ** **, Individuals served by FC, nor in S855 ** 76, Individuals served by Organization.
 
 
-  rlog::log_info("Generating S491 60 10 & S491 65 10 statistic")
+  rlog::log_info("Generating S491 60 10 and S491 65 10 statistics")
 
   calc_491_60_10 <- mis_unregistered_interactions |>
     filter_eligible("491") |>
@@ -789,7 +789,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
   # Write mis_visit_and_service_counts_by_fc to file ----
 
-  rlog::log_info("Writing cumulative-type statistics files")
+  rlog::log_info("Writing mis_visit_and_service_counts_by_fc.csv")
 
   mis_visit_and_service_counts_by_fc <- dplyr::bind_rows(report_248("fc"), report_265("fc"), report_266("fc"), report_401("fc"),
                                                          report_407("fc"), report_407_99("fc"), report_410_513_cmha("fc"), report_410_513_css("fc"),
@@ -802,6 +802,7 @@ generate_visit_and_service_counts <- function(processed_data,
   check_accounts(mis_visit_and_service_counts_by_fc, "mis_visit_and_service_counts_by_fc")
   readr::write_csv(mis_visit_and_service_counts_by_fc, paste0(data_folder, "/processed/mis_visit_and_service_counts_by_fc.csv"), na = "")
 
+  rlog::log_info("Writing mis_visit_and_service_counts_by_service.csv")
 
   mis_visit_and_service_counts_by_service <- dplyr::bind_rows(report_248("service"), report_265("service"), report_266("service"),
                                                               report_401("service"), report_407("service"), report_407_99("service"),
