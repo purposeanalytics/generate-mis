@@ -135,7 +135,7 @@ unreg <- tibble::tibble(
                 service_sub_service_name = NA_character_)
 activities <- dplyr::bind_rows(activities, dplyr::bind_rows(grp), unreg)
 fc_mapping <- services |> dplyr::distinct(funder_service_code, service_name) |>
-  dplyr::mutate(service_department = "Dept")
+  dplyr::mutate(service_department_name = "Dept")
 
 data_folder <- file.path(tempfile("golden-"), "data")
 dir.create(file.path(data_folder, "interim", "rds"), recursive = TRUE)

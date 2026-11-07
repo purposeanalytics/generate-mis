@@ -221,7 +221,7 @@ fixture_participants <- function() {
 fixture_fc_mapping <- function() {
   tibble::tibble(funder_service_code = names(service_names),
                  service_name = unname(service_names),
-                 service_department = NA_character_)
+                 service_department_name = NA_character_)
 }
 
 # Write the fixtures to a temporary data folder and run the full pipeline.

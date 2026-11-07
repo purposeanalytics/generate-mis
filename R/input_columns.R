@@ -42,7 +42,7 @@ input_columns <- dplyr::tribble(
 
   "functional_centre_mapping",  "funder_service_code",               "required",  "all",
   "functional_centre_mapping",  "service_name",                      "expected",  "service list for the Power BI report",
-  "functional_centre_mapping",  "service_department",                "expected",  "service list"
+  "functional_centre_mapping",  "service_department_name",           "expected",  "service list"
 )
 
 # Stop if a required column is missing; warn and fill with NA if an expected one is.

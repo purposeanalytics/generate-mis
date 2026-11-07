@@ -122,7 +122,7 @@ Language and special needs are recorded once per participant and read from parti
 | Column | Level | Used for |
 |---|---|---|
 | `funder_service_code` | required | all |
-| `service_name`, `service_department` | expected | service list for the Power BI report |
+| `service_name`, `service_department_name` | expected | service list for the Power BI report |
 
 ## Tests
 
