@@ -77,13 +77,13 @@ fast_age_calculation <- function(df, date_of_birth, reference_date, feb29_as = "
   bp_breaks <- if (is.null(age_breakpoints)) default_breaks else age_breakpoints$breaks
   bp_labels <- if (is.null(age_breakpoints)) default_labels else age_breakpoints$labels
 
-  df <- df %>% dplyr::mutate(
+  df <- df |> dplyr::mutate(
     reference_date = as.Date({{ reference_date }}),
     date_of_birth  = as.Date({{ date_of_birth }})
   )
 
-  participants <- df %>%
-    dplyr::distinct(participant_id, date_of_birth) %>%
+  participants <- df |> 
+    dplyr::distinct(participant_id, date_of_birth) |> 
     dplyr::arrange(participant_id)
 
   dob_lt   <- as.POSIXlt(participants$date_of_birth)
