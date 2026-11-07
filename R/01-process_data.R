@@ -38,7 +38,7 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
 
   # Build service list ----
 
-  service_list <- all_functional_centres_and_statistical_codes |>
+  service_list <- generateMIS::all_functional_centres_and_statistical_codes |>
     dplyr::right_join(functional_centre_mapping, by = c("funder_service_code")) |>
     dplyr::mutate(funder_target_category = NA,
            funder_target_category = dplyr::if_else(stringr::str_detect(funder_statistical_account_category, "248"), "Meals Delivered-Combined", funder_target_category ),
@@ -130,8 +130,8 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
 
   mis_daily_census <- mis_service_history |>
     dplyr::filter(service_status != "Inactive") |>
-    dplyr::filter(is.na(service_status_end_date) | service_status_end_date >= dashboard_start_date) |>
-    dplyr::mutate(start_date = dplyr::if_else(service_status_start_date < dashboard_start_date, dashboard_start_date, service_status_start_date),
+    dplyr::filter(is.na(service_status_end_date) | service_status_end_date >= generateMIS::dashboard_start_date) |>
+    dplyr::mutate(start_date = dplyr::if_else(service_status_start_date < generateMIS::dashboard_start_date, generateMIS::dashboard_start_date, service_status_start_date),
            end_date = dplyr::if_else(service_status_end_date > report_date | is.na(service_status_end_date), report_date + lubridate::days(1), service_status_end_date),
 
            # for active period, make end_date day before discharge date except when start and end are same day

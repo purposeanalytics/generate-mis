@@ -166,7 +166,7 @@ default_sr_category <- function(funder_service_code) {
 #' @examples
 filter_eligible <- function(df, statistical_code){
 
-  eligible_fcs <- all_functional_centres_and_statistical_codes |>
+  eligible_fcs <- generateMIS::all_functional_centres_and_statistical_codes |>
     dplyr::filter(stringr::str_starts(funder_statistical_account_code, statistical_code)) |>
     dplyr::distinct(funder_service_code) |>
     dplyr::pull()
@@ -253,7 +253,7 @@ age_digit <- function(age_group_code) {
 # that builds an account the FC doesn't report, or a gap in the code table. The code table
 # has no fund type 3 copy of the organization FC, so 83 9 90 is checked against 82 9 90.
 check_accounts <- function(output, table_name) {
-  valid <- all_functional_centres_and_statistical_codes |>
+  valid <- generateMIS::all_functional_centres_and_statistical_codes |>
     dplyr::distinct(funder_service_code, funder_statistical_account_code)
 
   unknown <- output |>

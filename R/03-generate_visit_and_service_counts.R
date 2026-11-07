@@ -688,7 +688,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
     report_506 <- function(grain) {
       fc_episodes(calc_506, grain, report_date) |>
-        dplyr::filter(!is.na(first_active_date), first_active_date >= dashboard_start_date) |>
+        dplyr::filter(!is.na(first_active_date), first_active_date >= generateMIS::dashboard_start_date) |>
         dplyr::left_join(age_on_day, by = c("participant_id", "first_active_date" = "date")) |>
         dplyr::mutate(participant_funder_age_group_code = dplyr::coalesce(age_group_on_day, participant_funder_age_group_code)) |>
         add_statistical_account(statistic = "506",
