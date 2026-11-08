@@ -33,8 +33,10 @@ generate_census_counts <- function(processed_data,
     dplyr::mutate(fund_type = stringr::str_sub(funder_service_code, 2, 2))
 
   # Each FC-level statistic below is a function of `grain` ("fc" or "service"; see
-  # grain_cols()), run once per grain when the output tables are put together at the end.
-  # Organization-level statistics (reported in AC 8* 9 90) have no grain.
+  # grain_cols()) that returns one row per client, unit and day. When the output tables are
+  # put together at the end, S403/S406 are counted per day, and every statistic is turned
+  # into detail rows (census_runs()). Organization-level statistics (reported in AC 8* 9 90)
+  # have no grain.
 
 
   # S403 4* *0 Resident Days ----
@@ -54,7 +56,7 @@ generate_census_counts <- function(processed_data,
       add_statistical_account(statistic = "403",
                               sr_category = default_sr_category(funder_service_code),
                               detail = participant_funder_age_group_code) |>
-      count_by_grain(grain)
+      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id)
   }
 
 
@@ -75,7 +77,7 @@ generate_census_counts <- function(processed_data,
       add_statistical_account(statistic = "406",
                               sr_category = default_sr_category(funder_service_code),
                               detail = "20") |>
-      count_by_grain(grain)
+      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id)
   }
 
 
@@ -99,7 +101,7 @@ generate_census_counts <- function(processed_data,
       add_statistical_account(statistic = "406",
                               sr_category = "99",
                               detail = "10") |>
-      count_by_grain(grain)
+      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id)
   }
 
 
@@ -270,13 +272,30 @@ generate_census_counts <- function(processed_data,
   }
 
 
+  # Daily rows for each grain, built once ----
+
+  daily_fc <- list(counted = dplyr::bind_rows(calc_403("fc"), calc_406("fc"), calc_406_99("fc")),
+                   served = dplyr::bind_rows(calc_455("fc"), calc_org_855_css, calc_org_855_cmha,
+                                             calc_org_950_10, calc_950("fc"), calc_955("fc")))
+  daily_service <- list(counted = dplyr::bind_rows(calc_403("service"), calc_406("service"), calc_406_99("service")),
+                        served = dplyr::bind_rows(calc_455("service"), calc_950("service"), calc_955("service")))
+
+  # Detail rows: runs of consecutive days per client, split at month boundaries
+  detail_fc <- census_runs(dplyr::bind_rows(daily_fc), "fc") |> detail_by_grain("fc", value = value)
+  detail_service <- census_runs(dplyr::bind_rows(daily_service), "service") |> detail_by_grain("service", value = value)
+
+
   # Write mis_census_counts_by_fc to file ----
+
+  # S403/S406 are counts per day; S455, S855, S950 and S955 stay one row per client and day,
+  # for a distinct count in the report
+  census_table <- function(daily, grain) {
+    dplyr::bind_rows(count_by_grain(daily$counted, grain), daily$served)
+  }
 
   rlog::log_info("Writing mis_census_counts_by_fc.csv")
 
-  mis_census_counts_by_fc <- dplyr::bind_rows(calc_403("fc"), calc_406("fc"), calc_406_99("fc"), calc_455("fc"),
-                                              calc_org_855_css, calc_org_855_cmha, calc_org_950_10,
-                                              calc_950("fc"), calc_955("fc")) |>
+  mis_census_counts_by_fc <- census_table(daily_fc, "fc") |>
     dplyr::mutate(funder_key = paste0(funder_service_code, "_", funder_statistical_account_code))
 
   check_accounts(mis_census_counts_by_fc, "mis_census_counts_by_fc")
@@ -284,12 +303,13 @@ generate_census_counts <- function(processed_data,
 
   rlog::log_info("Writing mis_census_counts_by_service.csv")
 
-  mis_census_counts_by_service <- dplyr::bind_rows(calc_403("service"), calc_406("service"), calc_406_99("service"),
-                                                   calc_455("service"), calc_950("service"), calc_955("service")) |>
+  mis_census_counts_by_service <- census_table(daily_service, "service") |>
     dplyr::mutate(funder_service_key = paste0(funder_service_code, "_", service_name, "_", funder_statistical_account_code))
 
   readr::write_csv(mis_census_counts_by_service, paste0(data_folder, "/processed/mis_census_counts_by_service.csv"), na = "")
 
   invisible(list(mis_census_counts_by_fc = mis_census_counts_by_fc,
-                 mis_census_counts_by_service = mis_census_counts_by_service))
+                 mis_census_counts_by_service = mis_census_counts_by_service,
+                 detail_by_fc = detail_fc,
+                 detail_by_service = detail_service))
 }

@@ -823,6 +823,6 @@ generate_visit_and_service_counts <- function(processed_data,
 
   invisible(list(mis_visit_and_service_counts_by_fc = mis_visit_and_service_counts_by_fc,
                  mis_visit_and_service_counts_by_service = mis_visit_and_service_counts_by_service,
-                 mis_detail_by_fc = label_detail(detail_fc),
-                 mis_detail_by_service = label_detail(detail_service)))
+                 detail_by_fc = detail_fc,
+                 detail_by_service = detail_service))
 }

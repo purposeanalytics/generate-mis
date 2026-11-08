@@ -423,7 +423,7 @@ detail_by_grain <- function(df, grain, value = 1L, source_date = lubridate::NA_D
     df <- dplyr::mutate(df, service_enrollment_id = {{ enrollment_id }})
   }
   df |>
-    dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code,
+    dplyr::select(date, dplyr::any_of("end_date"), dplyr::all_of(grain_cols(grain)), funder_statistical_account_code,
                   dplyr::any_of(c("participant_id", "service_enrollment_id", "all_enrollment_ids",
                                   "activity_id", "activity_group_id")),
                   value, source_date, source_note)
@@ -434,6 +434,22 @@ detail_by_grain <- function(df, grain, value = 1L, source_date = lubridate::NA_D
 na_to_zero <- function(x) {
   x[is.na(x)] <- vector(typeof(x), 1)
   x
+}
+
+# Census detail: daily rows (one per client, reporting unit, account and day) as runs of
+# consecutive days, split at month boundaries. Each run is one detail row from `date` to
+# `end_date`, with value = days in the run. Expanding the runs back into days gives the
+# daily rows again, so S403 sums by month and S406 / S455 can be read off any day.
+census_runs <- function(rows, grain) {
+  keys <- c(grain_cols(grain), "funder_statistical_account_code", "participant_id")
+  rows |>
+    dplyr::distinct(dplyr::pick(dplyr::all_of(c("date", keys)))) |>
+    dplyr::arrange(dplyr::pick(dplyr::all_of(c(keys, "date")))) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(keys)), month = lubridate::floor_date(date, "month")) |>
+    dplyr::mutate(run = cumsum(c(1L, diff(as.integer(date)) != 1L))) |>
+    dplyr::group_by(run, .add = TRUE) |>
+    dplyr::summarize(end_date = max(date), value = dplyr::n(), date = min(date), .groups = "drop") |>
+    dplyr::select(-month, -run)
 }
 
 # Summary rows (date, reporting unit, account, value) from detail rows

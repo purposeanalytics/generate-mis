@@ -7,8 +7,10 @@
 #' @param debug
 #'
 #' @return Invisibly, a list of the four tables written to `data/processed`, plus
-#'   `mis_detail_by_fc` and `mis_detail_by_service`: one row per counted unit (episode,
-#'   visit or session) behind the visit and service counts. These are not written to files.
+#'   `mis_detail_by_fc` and `mis_detail_by_service`: the rows behind every statistic. Visit
+#'   and service statistics have one row per counted unit (episode, visit or session);
+#'   census statistics have one row per run of consecutive days for a client, within a
+#'   month (`date` to `end_date`). These are not written to files.
 #' @export
 #'
 #' @examples
@@ -36,5 +38,13 @@ generate_tables <- function(data_folder = here::here("data"),
 
   tictoc::toc()
 
-  invisible(c(census_counts, visit_and_service_counts))
+  # one detail table per grain, census and visit statistics together
+  detail <- function(grain) {
+    name <- paste0("detail_by_", grain)
+    label_detail(dplyr::bind_rows(census_counts[[name]], visit_and_service_counts[[name]]))
+  }
+  summaries <- c(census_counts, visit_and_service_counts)
+  summaries <- summaries[!startsWith(names(summaries), "detail_by_")]
+
+  invisible(c(summaries, list(mis_detail_by_fc = detail("fc"), mis_detail_by_service = detail("service"))))
 }

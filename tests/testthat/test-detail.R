@@ -1,10 +1,12 @@
-# Detail tables: one row per counted unit, and the summary tables are their sums.
+# Detail tables: the rows behind every statistic. Visit and service counts are the sums of
+# their detail rows; census counts are their detail runs expanded back into days.
 
-# Detail summed back to date, reporting unit and account, compared with the summary rows for
-# the same statistics
+# Visit and service detail summed back to date, reporting unit and account, compared with
+# the summary rows
 expect_detail_matches_summary <- function(out, grain) {
-  detail <- out[[paste0("mis_detail_by_", grain)]]
   summary <- out[[paste0("mis_visit_and_service_counts_by_", grain)]]
+  detail <- out[[paste0("mis_detail_by_", grain)]] |>
+    dplyr::filter(statistic %in% substr(summary$funder_statistical_account_code, 1, 3))
   keys <- c("date", grain_cols(grain), "funder_statistical_account_code")
 
   from_detail <- detail |>
@@ -12,7 +14,6 @@ expect_detail_matches_summary <- function(out, grain) {
     dplyr::summarize(value = sum(value), .groups = "drop") |>
     dplyr::arrange(dplyr::across(dplyr::all_of(keys)))
   from_summary <- summary |>
-    dplyr::filter(substr(funder_statistical_account_code, 1, 3) %in% unique(detail$statistic)) |>
     dplyr::select(dplyr::all_of(keys), value) |>
     dplyr::arrange(dplyr::across(dplyr::all_of(keys)))
 
@@ -31,10 +32,11 @@ test_that("detail rows add up to the summary rows, by FC and by service", {
 test_that("detail rows name the client, enrollment and why they were counted", {
   out <- run_mis()
   detail <- out$mis_detail_by_fc
-  # every statistic in the visit and service table has detail rows
+  # every statistic in the census and visit tables has detail rows, with its aggregation type
   expect_setequal(unique(detail$statistic),
-                  unique(substr(out$mis_visit_and_service_counts_by_fc$funder_statistical_account_code, 1, 3)))
-  expect_true(all(detail$aggregation == "sum_visits_and_services"))
+                  unique(substr(c(out$mis_visit_and_service_counts_by_fc$funder_statistical_account_code,
+                                  out$mis_census_counts_by_fc$funder_statistical_account_code), 1, 3)))
+  expect_false(anyNA(detail$aggregation))
 
   # R3: back on the waitlist Jun 23, so discharged that day (S513) and referred again (S489)
   r3 <- detail[detail$participant_id %in% "R3", ]
@@ -118,4 +120,55 @@ test_that("organization detail: S501 and S511 rows in AC 82 9 90", {
   expect_equal(closed$source_note, "10 - Goals met")
   expect_equal(closed$service_enrollment_id, "E14")
   expect_true(as.Date("2025-07-07") %in% r2$date[r2$statistic == "501"])
+})
+
+# Census detail runs expanded back into one row per day, compared with the census table:
+# counts per day for S403/S406, and the same client-days for S455, S855, S950 and S955
+expect_runs_match_census <- function(out, grain) {
+  census <- out[[paste0("mis_census_counts_by_", grain)]]
+  keys <- c("date", grain_cols(grain), "funder_statistical_account_code")
+  runs <- out[[paste0("mis_detail_by_", grain)]] |>
+    dplyr::filter(statistic %in% substr(census$funder_statistical_account_code, 1, 3))
+  days <- runs |>
+    dplyr::mutate(date = purrr::map2(date, end_date, seq, by = "day")) |>
+    tidyr::unnest(date)
+  # a run's value is its number of days
+  expect_equal(nrow(days), sum(runs$value))
+
+  counted <- census |> dplyr::filter(!is.na(value))
+  expect_equal(days |> dplyr::filter(statistic %in% c("403", "406")) |>
+                 dplyr::count(dplyr::across(dplyr::all_of(keys)), name = "value") |>
+                 dplyr::arrange(dplyr::across(dplyr::all_of(keys))),
+               counted |> dplyr::select(dplyr::all_of(keys), value) |>
+                 dplyr::arrange(dplyr::across(dplyr::all_of(keys))),
+               ignore_attr = TRUE)
+
+  served_keys <- c(keys, "participant_id")
+  expect_equal(days |> dplyr::filter(!statistic %in% c("403", "406")) |>
+                 dplyr::distinct(dplyr::across(dplyr::all_of(served_keys))) |>
+                 dplyr::arrange(dplyr::across(dplyr::all_of(served_keys))),
+               census |> dplyr::filter(is.na(value)) |>
+                 dplyr::distinct(dplyr::across(dplyr::all_of(served_keys))) |>
+                 dplyr::arrange(dplyr::across(dplyr::all_of(served_keys))),
+               ignore_attr = TRUE)
+}
+
+test_that("census detail runs expand back to the census table, by FC and by service", {
+  for (version in c("verA", "verB", "verC")) {
+    out <- run_mis(fc_455_version = version)
+    expect_runs_match_census(out, "fc")
+    expect_runs_match_census(out, "service")
+  }
+})
+
+test_that("census runs stop at month ends and between gaps", {
+  rows <- tibble::tibble(
+    funder_service_code = "72 5 40 76 10", funder_statistical_account_code = "403 45 40",
+    participant_id = "X1",
+    date = as.Date(c("2025-04-29", "2025-04-30", "2025-05-01", "2025-05-02", "2025-05-05"))
+  )
+  runs <- census_runs(rows, "fc") |> dplyr::arrange(date)
+  expect_equal(runs$date, as.Date(c("2025-04-29", "2025-05-01", "2025-05-05")))
+  expect_equal(runs$end_date, as.Date(c("2025-04-30", "2025-05-02", "2025-05-05")))
+  expect_equal(runs$value, c(2L, 2L, 1L))
 })
