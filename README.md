@@ -111,6 +111,7 @@ The full list is `input_columns` in `R/input_columns.R`. Keep this section in st
 | `activity_count` | required | visits, interactions |
 | `activity_worker_count` | required | interactions, hours of care |
 | `activity_group_id` | required | group sessions and attendance |
+| `activity_id` | expected | detail tables: the visit behind each count. AlayaCare's visit ID; data prep generates a stable, unique ID for CRMS |
 | `participant_funder_age_group_code` | required | age groups |
 | `activity_assessment` | expected | CSS assessments |
 | `service_sub_service_name` | expected | 248 meal types |

@@ -367,6 +367,8 @@ earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, me
       merged_start_date = dplyr::first({{dimension_start}}),
       merged_end_date = dplyr::last(end_date),
       merged_report_date = max_or_blank(.report_date),
+      # the enrollment whose wait started the merged period
+      first_enrollment_id = dplyr::first(service_enrollment_id),
       all_starts = paste({{dimension_start}}, collapse = ", "),
       all_ends = paste({{dimension_end}}, collapse = ", "),
       all_funder_service_codes = paste(funder_service_code, collapse = ", "),
@@ -422,11 +424,19 @@ detail_by_grain <- function(df, grain, value = 1L, source_date = lubridate::NA_D
   }
   df |>
     dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code,
-                  dplyr::any_of(c("participant_id", "service_enrollment_id", "all_enrollment_ids")),
+                  dplyr::any_of(c("participant_id", "service_enrollment_id", "all_enrollment_ids",
+                                  "activity_id", "activity_group_id")),
                   value, source_date, source_note)
 }
 
-# Summary rows (as count_by_grain() / sum_by_grain()) from detail rows
+# NA as zero, keeping the type (a missing count or duration adds nothing to a sum, as
+# sum(na.rm = TRUE) did)
+na_to_zero <- function(x) {
+  x[is.na(x)] <- vector(typeof(x), 1)
+  x
+}
+
+# Summary rows (date, reporting unit, account, value) from detail rows
 summarise_detail <- function(detail, grain) {
   detail |>
     dplyr::group_by(date, dplyr::across(dplyr::all_of(grain_cols(grain))), funder_statistical_account_code) |>
@@ -440,13 +450,6 @@ label_detail <- function(detail) {
     dplyr::mutate(statistic = stringr::str_sub(funder_statistical_account_code, 1, 3)) |>
     dplyr::left_join(statistic_aggregation, by = "statistic") |>
     dplyr::relocate(statistic, aggregation, .after = funder_statistical_account_code)
-}
-
-# Sum an expression per date, reporting unit and statistical account
-sum_by_grain <- function(df, grain, value) {
-  df |>
-    dplyr::group_by(date, dplyr::across(dplyr::all_of(grain_cols(grain))), funder_statistical_account_code) |>
-    dplyr::summarize(value = {{ value }}, .groups = "drop")
 }
 
 # Fiscal year (April to March) as the 4-digit year it ends in (2025-04-01 is in "2026")

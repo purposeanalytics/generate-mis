@@ -133,7 +133,8 @@ unreg <- tibble::tibble(
                 participant_funder_age_group_code = NA_character_, participant_preferred_language = NA_character_,
                 participant_ohrs_special_needs = NA_character_, activity_assessment = NA_character_,
                 service_sub_service_name = NA_character_)
-activities <- dplyr::bind_rows(activities, dplyr::bind_rows(grp), unreg)
+activities <- dplyr::bind_rows(activities, dplyr::bind_rows(grp), unreg) |>
+  dplyr::mutate(activity_id = paste0("A", dplyr::row_number()))
 fc_mapping <- services |> dplyr::distinct(funder_service_code, service_name) |>
   dplyr::mutate(service_department_name = "Dept")
 

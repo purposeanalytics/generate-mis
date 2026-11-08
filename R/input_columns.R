@@ -36,6 +36,7 @@ input_columns <- dplyr::tribble(
   "activities",                 "activity_count",                    "required",  "visits, interactions",
   "activities",                 "activity_worker_count",             "required",  "interactions, hours of care",
   "activities",                 "activity_group_id",                 "required",  "group sessions and attendance",
+  "activities",                 "activity_id",                       "expected",  "detail tables (the visit behind each count)",
   "activities",                 "participant_funder_age_group_code", "required",  "age groups",
   "activities",                 "activity_assessment",               "expected",  "CSS assessments",
   "activities",                 "service_sub_service_name",          "expected",  "S248 meal types",

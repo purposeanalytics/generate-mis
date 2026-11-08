@@ -206,7 +206,8 @@ fixture_activities <- function() {
 
     # P13: a 3-minute trip. Transportation has no 5-minute rule, in either fund type.
     activity("P13", "E20", tr3_fc, "2025-06-04", "Face-to-face", 3)
-  )
+  ) |>
+    dplyr::mutate(activity_id = paste0("A", dplyr::row_number()))
 }
 
 fixture_participants <- function() {
