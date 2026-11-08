@@ -6,7 +6,10 @@
 #'   earlier date to reproduce a past run.
 #' @param debug
 #'
-#' @return Invisibly, a list of the four tables written to `data/processed`.
+#' @return Invisibly, a list of the four tables written to `data/processed`, plus
+#'   `mis_detail_by_fc` and `mis_detail_by_service`: one row per client counted, for the
+#'   statistics that have detail so far (S410, S411, S489, S506, S513). These are not
+#'   written to files.
 #' @export
 #'
 #' @examples

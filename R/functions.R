@@ -314,6 +314,13 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
               # reason on the row that ended last (e.g. the final discharge in the period)
               last_service_status_reason = service_status_reason[which.max(end_date)],
               service_first_direct_activity = min_or_blank(service_first_direct_activity),
+              # enrollment that started the merged period, the one that ended it, and the full
+              # list when more than one enrollment was merged (blank otherwise). These must come
+              # before service_enrollment_id below, which replaces the column with one value.
+              first_enrollment_id = dplyr::first(service_enrollment_id),
+              last_enrollment_id = service_enrollment_id[which.max(end_date)],
+              all_enrollment_ids = if (dplyr::n_distinct(service_enrollment_id) > 1)
+                paste(unique(service_enrollment_id), collapse = ", ") else NA_character_,
               service_enrollment_id = min_or_blank(service_enrollment_id),
               # whether service started at any point in the merged period, and when it first did
               ever_active = any(service_status == "Active"),
@@ -395,6 +402,44 @@ overlap_grouping <- function(merge_level) {
 count_by_grain <- function(df, grain) {
   df |>
     dplyr::count(date, dplyr::across(dplyr::all_of(grain_cols(grain))), funder_statistical_account_code, name = "value")
+}
+
+# Detail rows behind a statistic: one row per counted unit (an episode, a visit, a day),
+# with who it was and what it adds to the statistic. summarise_detail() turns these into
+# the summary rows, so the summary tables and the detail tables always agree.
+# - value: what the row adds to the statistic (1 for a count, or days, hours, attendances)
+# - source_date, source_note: why the row is counted, e.g. the episode start or the
+#   discharge reason (blank where there is nothing more to say)
+# - enrollment_id: the enrollment that triggered the count (one ID, for filtering). Where
+#   overlapping enrollments were merged, all_enrollment_ids lists them all.
+detail_by_grain <- function(df, grain, value = 1L, source_date = lubridate::NA_Date_,
+                            source_note = NA_character_, enrollment_id = NULL) {
+  df <- dplyr::mutate(df, value = {{ value }},
+                      source_date = as.Date({{ source_date }}),
+                      source_note = as.character({{ source_note }}))
+  if (!rlang::quo_is_null(rlang::enquo(enrollment_id))) {
+    df <- dplyr::mutate(df, service_enrollment_id = {{ enrollment_id }})
+  }
+  df |>
+    dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code,
+                  dplyr::any_of(c("participant_id", "service_enrollment_id", "all_enrollment_ids")),
+                  value, source_date, source_note)
+}
+
+# Summary rows (as count_by_grain() / sum_by_grain()) from detail rows
+summarise_detail <- function(detail, grain) {
+  detail |>
+    dplyr::group_by(date, dplyr::across(dplyr::all_of(grain_cols(grain))), funder_statistical_account_code) |>
+    dplyr::summarize(value = sum(value), .groups = "drop")
+}
+
+# Add the statistic (first three digits) and its aggregation type to detail rows, for
+# filtering and totals in the Power BI detail page
+label_detail <- function(detail) {
+  detail |>
+    dplyr::mutate(statistic = stringr::str_sub(funder_statistical_account_code, 1, 3)) |>
+    dplyr::left_join(statistic_aggregation, by = "statistic") |>
+    dplyr::relocate(statistic, aggregation, .after = funder_statistical_account_code)
 }
 
 # Sum an expression per date, reporting unit and statistical account

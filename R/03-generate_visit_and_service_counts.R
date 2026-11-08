@@ -268,7 +268,8 @@ generate_visit_and_service_counts <- function(processed_data,
                               sr_category = default_sr_category(funder_service_code),
                               detail = dplyr::if_else(funder_service_code %in% css_residential_fcs, participant_funder_age_group_code, service_status_reason_code)) |>
       dplyr::rename(date = merged_end_date) |>
-      count_by_grain(grain)
+      detail_by_grain(grain, source_date = merged_start_date, source_note = last_service_status_reason,
+                      enrollment_id = last_enrollment_id)
   }
 
 
@@ -283,7 +284,8 @@ generate_visit_and_service_counts <- function(processed_data,
                               sr_category = default_sr_category(funder_service_code),
                               detail = dplyr::if_else(default_sr_category(funder_service_code) == "45", participant_funder_age_group_code, "90")) |>
       dplyr::rename(date = merged_end_date) |>
-      count_by_grain(grain)
+      detail_by_grain(grain, source_date = merged_start_date, source_note = last_service_status_reason,
+                      enrollment_id = last_enrollment_id)
   }
 
 
@@ -522,7 +524,7 @@ generate_visit_and_service_counts <- function(processed_data,
                               sr_category = default_sr_category(funder_service_code),
                               detail = participant_funder_age_group_code) |>
       dplyr::rename(date = episode_decision_date) |>
-      count_by_grain(grain)
+      detail_by_grain(grain, source_date = merged_start_date, enrollment_id = first_enrollment_id)
   }
 
 
@@ -695,7 +697,7 @@ generate_visit_and_service_counts <- function(processed_data,
                                 sr_category = default_sr_category(funder_service_code),
                                 detail = participant_funder_age_group_code) |>
         dplyr::rename(date = first_active_date) |>
-        count_by_grain(grain)
+        detail_by_grain(grain, source_date = merged_start_date, enrollment_id = first_enrollment_id)
     }
   }
 
@@ -708,12 +710,13 @@ generate_visit_and_service_counts <- function(processed_data,
     report_506 <- function(grain) {
       calc_506 |>
         merge_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = grain) |>
-        dplyr::distinct(dplyr::pick(dplyr::all_of(c("participant_id", "participant_funder_age_group_code", "service_first_direct_activity", grain_cols(grain))))) |>
+        dplyr::distinct(dplyr::pick(dplyr::all_of(c("participant_id", "participant_funder_age_group_code", "service_first_direct_activity", grain_cols(grain)))),
+                        .keep_all = TRUE) |>
         add_statistical_account(statistic = "506",
                                 sr_category = default_sr_category(funder_service_code),
                                 detail = participant_funder_age_group_code) |>
         dplyr::rename(date = service_first_direct_activity) |>
-        count_by_grain(grain)
+        detail_by_grain(grain, source_date = merged_start_date, enrollment_id = first_enrollment_id)
     }
   }
 
@@ -787,16 +790,24 @@ generate_visit_and_service_counts <- function(processed_data,
   }
 
 
+  # Detail rows: one per counted unit, for the statistics converted so far. Their summary rows
+  # are built from these (summarise_detail()), so summary and detail always agree.
+  detail_fc <- dplyr::bind_rows(report_410_513_cmha("fc"), report_410_513_css("fc"), report_489("fc"), report_506("fc"))
+  detail_service <- dplyr::bind_rows(report_410_513_cmha("service"), report_410_513_css("service"),
+                                     report_489("service"), report_506("service"))
+
+
   # Write mis_visit_and_service_counts_by_fc to file ----
 
   rlog::log_info("Writing mis_visit_and_service_counts_by_fc.csv")
 
   mis_visit_and_service_counts_by_fc <- dplyr::bind_rows(report_248("fc"), report_265("fc"), report_266("fc"), report_401("fc"),
-                                                         report_407("fc"), report_407_99("fc"), report_410_513_cmha("fc"), report_410_513_css("fc"),
+                                                         report_407("fc"), report_407_99("fc"),
                                                          report_450_451_cmha("fc"), report_450_451_css("fc"), report_452_60_00("fc"), report_452_65_00("fc"),
-                                                         report_454("fc"), report_483_484("fc"), report_489("fc"), report_491_60_10("fc"),
+                                                         report_454("fc"), report_483_484("fc"), report_491_60_10("fc"),
                                                          report_491_65_10("fc"), report_491("fc"), report_492("fc"), calc_org_501,
-                                                         report_506("fc"), calc_fc_511_cmha, calc_fc_511_css, report_512("fc")) |>
+                                                         calc_fc_511_cmha, calc_fc_511_css, report_512("fc"),
+                                                         summarise_detail(detail_fc, "fc")) |>
     dplyr::mutate(funder_key = paste0(funder_service_code, "_", funder_statistical_account_code))
 
   check_accounts(mis_visit_and_service_counts_by_fc, "mis_visit_and_service_counts_by_fc")
@@ -806,16 +817,17 @@ generate_visit_and_service_counts <- function(processed_data,
 
   mis_visit_and_service_counts_by_service <- dplyr::bind_rows(report_248("service"), report_265("service"), report_266("service"),
                                                               report_401("service"), report_407("service"), report_407_99("service"),
-                                                              report_410_513_cmha("service"), report_410_513_css("service"),
                                                               report_450_451_cmha("service"), report_450_451_css("service"),
                                                               report_452_60_00("service"), report_452_65_00("service"), report_454("service"),
-                                                              report_483_484("service"), report_489("service"), report_491_60_10("service"),
+                                                              report_483_484("service"), report_491_60_10("service"),
                                                               report_491_65_10("service"), report_491("service"), report_492("service"),
-                                                              report_506("service"), report_512("service")) |>
+                                                              report_512("service"), summarise_detail(detail_service, "service")) |>
     dplyr::mutate(funder_service_key = paste0(funder_service_code, "_", service_name, "_", funder_statistical_account_code))
 
   readr::write_csv(mis_visit_and_service_counts_by_service, paste0(data_folder, "/processed/mis_visit_and_service_counts_by_service.csv"), na = "")
 
   invisible(list(mis_visit_and_service_counts_by_fc = mis_visit_and_service_counts_by_fc,
-                 mis_visit_and_service_counts_by_service = mis_visit_and_service_counts_by_service))
+                 mis_visit_and_service_counts_by_service = mis_visit_and_service_counts_by_service,
+                 mis_detail_by_fc = label_detail(detail_fc),
+                 mis_detail_by_service = label_detail(detail_service)))
 }
