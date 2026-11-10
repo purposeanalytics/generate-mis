@@ -17,10 +17,9 @@
 #'   statistic, so they are off by default; share them only with people who check the data.
 #'
 #' @return Invisibly, a list of the four tables written to `data/processed`, plus
-#'   `mis_detail_by_fc` and `mis_detail_by_service`: the rows behind every statistic. Visit
-#'   and service statistics have one row per counted unit (episode, visit or session);
-#'   census statistics have one row per run of consecutive days for a client, within a
-#'   month (`date` to `end_date`). These are written to files only when `detail = TRUE`.
+#'   `mis_detail_by_fc` and `mis_detail_by_service`: the rows behind the visit and service
+#'   counts, one per counted unit (episode, visit or session). These are written to files only
+#'   when `detail = TRUE`. The census tables are already one row per client per day.
 #' @export
 #'
 #' @examples
@@ -46,15 +45,9 @@ generate_tables <- function(data_folder = here::here("data"),
   census_counts <- generate_census_counts(processed_data, fc_455_version, fc_450_version)
   visit_and_service_counts <- generate_visit_and_service_counts(processed_data, fc_450_version, fc_506_version, ir_version)
 
-  # one detail table per grain, census and visit statistics together
-  combine_detail <- function(grain) {
-    name <- paste0("detail_by_", grain)
-    label_detail(dplyr::bind_rows(census_counts[[name]], visit_and_service_counts[[name]]))
-  }
-  summaries <- c(census_counts, visit_and_service_counts)
-  summaries <- summaries[!startsWith(names(summaries), "detail_by_")]
-
-  details <- list(mis_detail_by_fc = combine_detail("fc"), mis_detail_by_service = combine_detail("service"))
+  # visit and service detail; the census tables are already one row per client per day
+  details <- visit_and_service_counts[c("mis_detail_by_fc", "mis_detail_by_service")]
+  summaries <- c(census_counts, visit_and_service_counts[setdiff(names(visit_and_service_counts), names(details))])
 
   if (isTRUE(detail)) {
     for (name in names(details)) {

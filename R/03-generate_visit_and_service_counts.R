@@ -54,7 +54,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
   report_248 <- function(grain) {
     calc_248 |>
-      detail_by_grain(grain, value = na_to_zero(activity_count), source_note = service_sub_service_name)
+      detail_by_grain(grain, value = na_to_zero(activity_count), reference = activity_id)
   }
 
 
@@ -94,7 +94,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
   report_265 <- function(grain) {
     calc_265 |>
-      detail_by_grain(grain, value = na_to_zero(activity_count * activity_worker_count), source_note = activity_type)
+      detail_by_grain(grain, value = na_to_zero(activity_count * activity_worker_count), reference = activity_id)
   }
 
 
@@ -125,7 +125,7 @@ generate_visit_and_service_counts <- function(processed_data,
   report_266 <- function(grain) {
     calc_266 |>
       dplyr::distinct(dplyr::pick(dplyr::all_of(c("date", grain_cols(grain), "activity_group_id", "funder_statistical_account_code", "activity_worker_count")))) |>
-      detail_by_grain(grain, value = na_to_zero(activity_worker_count))
+      detail_by_grain(grain, value = na_to_zero(activity_worker_count), reference = activity_group_id)
   }
 
 
@@ -147,7 +147,7 @@ generate_visit_and_service_counts <- function(processed_data,
                               sr_category = default_sr_category(funder_service_code),
                               detail = participant_funder_age_group_code) |>
       dplyr::rename(date = first_active_date) |>
-      detail_by_grain(grain, source_date = merged_start_date, enrollment_id = first_enrollment_id)
+      detail_by_grain(grain, reference = enrollment_ids)
   }
 
 
@@ -184,8 +184,7 @@ generate_visit_and_service_counts <- function(processed_data,
                               sr_category = default_sr_category(funder_service_code),
                               detail = "20") |>
       dplyr::rename(date = merged_report_date) |>
-      detail_by_grain(grain, value = na_to_zero(days_waited), source_date = merged_start_date,
-                      enrollment_id = first_enrollment_id)
+      detail_by_grain(grain, value = na_to_zero(days_waited), reference = enrollment_ids)
   }
 
 
@@ -217,8 +216,7 @@ generate_visit_and_service_counts <- function(processed_data,
                               sr_category = "99",
                               detail = "10") |>
       dplyr::rename(date = merged_end_date) |>
-      detail_by_grain(grain, value = na_to_zero(days_waited), source_date = merged_start_date,
-                      enrollment_id = first_enrollment_id)
+      detail_by_grain(grain, value = na_to_zero(days_waited), reference = enrollment_ids)
   }
 
 
@@ -270,8 +268,7 @@ generate_visit_and_service_counts <- function(processed_data,
                               sr_category = default_sr_category(funder_service_code),
                               detail = dplyr::if_else(funder_service_code %in% css_residential_fcs, participant_funder_age_group_code, service_status_reason_code)) |>
       dplyr::rename(date = merged_end_date) |>
-      detail_by_grain(grain, source_date = merged_start_date, source_note = last_service_status_reason,
-                      enrollment_id = last_enrollment_id)
+      detail_by_grain(grain, reference = enrollment_ids)
   }
 
 
@@ -286,8 +283,7 @@ generate_visit_and_service_counts <- function(processed_data,
                               sr_category = default_sr_category(funder_service_code),
                               detail = dplyr::if_else(default_sr_category(funder_service_code) == "45", participant_funder_age_group_code, "90")) |>
       dplyr::rename(date = merged_end_date) |>
-      detail_by_grain(grain, source_date = merged_start_date, source_note = last_service_status_reason,
-                      enrollment_id = last_enrollment_id)
+      detail_by_grain(grain, reference = enrollment_ids)
   }
 
 
@@ -341,7 +337,7 @@ generate_visit_and_service_counts <- function(processed_data,
     calc_450_451_cmha |>
       dplyr::rename(date = activity_date) |>
       one_per_person_per_day(grain) |>
-      detail_by_grain(grain, source_note = activity_type)
+      detail_by_grain(grain, reference = activity_id)
   }
 
 
@@ -368,7 +364,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
   report_450_451_css <- function(grain) {
     calc_450_451_css |>
-      detail_by_grain(grain, value = na_to_zero(activity_count), source_note = activity_type)
+      detail_by_grain(grain, value = na_to_zero(activity_count), reference = activity_id)
   }
 
 
@@ -388,7 +384,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
   report_452_60_00 <- function(grain) {
     calc_452_60_00 |>
-      detail_by_grain(grain, value = na_to_zero(activity_count))
+      detail_by_grain(grain, value = na_to_zero(activity_count), reference = activity_id)
   }
 
 
@@ -403,7 +399,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
   report_452_65_00 <- function(grain) {
     calc_452_65_00 |>
-      detail_by_grain(grain, value = na_to_zero(activity_count))
+      detail_by_grain(grain, value = na_to_zero(activity_count), reference = activity_id)
   }
 
 
@@ -440,7 +436,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
   report_454 <- function(grain) {
     calc_454 |>
-      detail_by_grain(grain, value = na_to_zero(hours), source_note = activity_type)
+      detail_by_grain(grain, value = na_to_zero(hours), reference = activity_id)
   }
 
   # S483 ** ** Attendance Days – Face to Face ----
@@ -500,7 +496,7 @@ generate_visit_and_service_counts <- function(processed_data,
   report_483_484 <- function(grain) {
     calc_483_484 |>
       one_per_person_per_day(grain) |>
-      detail_by_grain(grain, source_note = activity_type)
+      detail_by_grain(grain, reference = activity_id)
   }
 
 
@@ -526,7 +522,7 @@ generate_visit_and_service_counts <- function(processed_data,
                               sr_category = default_sr_category(funder_service_code),
                               detail = participant_funder_age_group_code) |>
       dplyr::rename(date = episode_decision_date) |>
-      detail_by_grain(grain, source_date = merged_start_date, enrollment_id = first_enrollment_id)
+      detail_by_grain(grain, reference = enrollment_ids)
   }
 
 
@@ -551,7 +547,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
   report_491_60_10 <- function(grain) {
     calc_491_60_10 |>
-      detail_by_grain(grain, value = na_to_zero(activity_count))
+      detail_by_grain(grain, value = na_to_zero(activity_count), reference = activity_id)
   }
 
 
@@ -566,7 +562,7 @@ generate_visit_and_service_counts <- function(processed_data,
 
   report_491_65_10 <- function(grain) {
     calc_491_65_10 |>
-      detail_by_grain(grain, value = na_to_zero(activity_count))
+      detail_by_grain(grain, value = na_to_zero(activity_count), reference = activity_id)
   }
 
 
@@ -587,7 +583,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::rename(date = activity_date)
 
   report_491 <- function(grain) {
-    detail_by_grain(calc_491, grain)
+    detail_by_grain(calc_491, grain, reference = activity_id)
   }
 
 
@@ -631,7 +627,7 @@ generate_visit_and_service_counts <- function(processed_data,
     calc_492 |>
       dplyr::rename(date = activity_date) |>
       dplyr::distinct(dplyr::pick(dplyr::all_of(c("date", "activity_group_id", grain_cols(grain), "funder_statistical_account_code")))) |>
-      detail_by_grain(grain)
+      detail_by_grain(grain, reference = activity_group_id)
   }
 
 
@@ -667,7 +663,7 @@ generate_visit_and_service_counts <- function(processed_data,
     add_statistical_account(statistic = "501",
                             sr_category = sr_code,
                             detail = participant_funder_age_group_code) |>
-    detail_by_grain("fc", enrollment_id = first_enrollment_id)
+    detail_by_grain("fc", reference = enrollment_ids)
 
 
   # S506 ** *0 Individuals Received First Service ----
@@ -699,7 +695,7 @@ generate_visit_and_service_counts <- function(processed_data,
                                 sr_category = default_sr_category(funder_service_code),
                                 detail = participant_funder_age_group_code) |>
         dplyr::rename(date = first_active_date) |>
-        detail_by_grain(grain, source_date = merged_start_date, enrollment_id = first_enrollment_id)
+        detail_by_grain(grain, reference = enrollment_ids)
     }
   }
 
@@ -718,7 +714,7 @@ generate_visit_and_service_counts <- function(processed_data,
                                 sr_category = default_sr_category(funder_service_code),
                                 detail = participant_funder_age_group_code) |>
         dplyr::rename(date = service_first_direct_activity) |>
-        detail_by_grain(grain, source_date = merged_start_date, enrollment_id = first_enrollment_id)
+        detail_by_grain(grain, reference = enrollment_ids)
     }
   }
 
@@ -743,8 +739,7 @@ generate_visit_and_service_counts <- function(processed_data,
                             detail = dplyr::case_when(sr_code == "80" & stringr::str_detect(service_status_reason_code, "^\\d\\d$") ~ service_status_reason_code,
                                                       .default = "90")) |>
     dplyr::rename(date = merged_end_date) |>
-    detail_by_grain("fc", source_date = merged_start_date, source_note = last_service_status_reason,
-                    enrollment_id = last_enrollment_id)
+    detail_by_grain("fc", reference = enrollment_ids)
 
 
   # S512 ** ** Assessment Complete/Outcome (4th, 5th digits = SR category)
@@ -780,7 +775,7 @@ generate_visit_and_service_counts <- function(processed_data,
                                                         stringr::str_detect(activity_assessment, "Assessment Complete/Outcome – Eligible In-Home – Other Organizations") ~ "29",
                                                         .default = "12")) |>
       dplyr::rename(date = activity_date) |>
-      detail_by_grain(grain, source_note = activity_assessment)
+      detail_by_grain(grain, reference = activity_id)
   }
 
 
@@ -823,6 +818,6 @@ generate_visit_and_service_counts <- function(processed_data,
 
   invisible(list(mis_visit_and_service_counts_by_fc = mis_visit_and_service_counts_by_fc,
                  mis_visit_and_service_counts_by_service = mis_visit_and_service_counts_by_service,
-                 detail_by_fc = detail_fc,
-                 detail_by_service = detail_service))
+                 mis_detail_by_fc = add_aggregation(detail_fc),
+                 mis_detail_by_service = add_aggregation(detail_service)))
 }
