@@ -1,8 +1,10 @@
-#' Generate census count tables
+#' Generate the census statistics
 #'
 #' @param processed_data
 #'
-#' @return
+#' @return A list of census rows in the detail table layout, `fc` and `service`: one row per
+#'   client, reporting unit, account and day, with value 1. [generate_tables()] writes them
+#'   in the detail tables, with the visit and service rows.
 #' @export
 #'
 #' @examples
@@ -14,7 +16,6 @@ generate_census_counts <- function(processed_data,
 
   rlog::log_info(glue::glue("Applying fc_455_version = '{fc_455_version}' and fc_450_version = '{fc_450_version}' to census counts"))
 
-  data_folder <- processed_data$data_folder
   mis_service_history <- processed_data$mis_service_history
   # Visits used as evidence that someone was served (S455, S855, S950, S955).
   # An assessment is client activity only in the CSS case management FC (OHRS Ch. 10,
@@ -33,9 +34,9 @@ generate_census_counts <- function(processed_data,
     dplyr::mutate(fund_type = stringr::str_sub(funder_service_code, 2, 2))
 
   # Each FC-level statistic below is a function of `grain` ("fc" or "service"; see
-  # grain_cols()) that returns one row per client, unit and day. The census tables are these
-  # rows (value 1), so they are also the census detail: S403 totals by adding up `value`,
-  # S406 by the rows on the last day, and S455, S855, S950 and S955 by distinct clients.
+  # grain_cols()) that returns one row per client, unit and day. These rows (value 1) go in
+  # the detail tables: S403 totals by adding up `value`, S406 by the rows on the last day,
+  # and S455, S855, S950 and S955 by distinct clients.
   # Organization-level statistics (reported in AC 8* 9 90) have no grain.
 
 
@@ -280,32 +281,20 @@ generate_census_counts <- function(processed_data,
                                     calc_455("service"), calc_950("service"), calc_955("service"))
 
 
-  # Write mis_census_counts_by_fc to file ----
+  # Census rows for the detail tables ----
 
-  # One row per client, unit, account and day, with value 1 and the aggregation type
-  census_table <- function(daily, grain) {
+  # One row per client, unit, account and day, with value 1, in the detail table layout.
+  # generate_tables() adds them to the visit and service detail and writes the files.
+  census_rows <- function(daily, grain) {
     daily |>
       dplyr::distinct() |>
-      dplyr::mutate(value = 1L) |>
-      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, value, participant_id) |>
-      add_aggregation()
+      detail_by_grain(grain) |>
+      add_aggregation() |>
+      add_funder_key(grain)
   }
 
-  rlog::log_info("Writing mis_census_counts_by_fc.csv")
+  census_by_fc <- census_rows(daily_fc, "fc")
+  check_accounts(census_by_fc, "mis_detail_by_fc (census statistics)")
 
-  mis_census_counts_by_fc <- census_table(daily_fc, "fc") |>
-    dplyr::mutate(funder_key = paste0(funder_service_code, "_", funder_statistical_account_code))
-
-  check_accounts(mis_census_counts_by_fc, "mis_census_counts_by_fc")
-  readr::write_csv(mis_census_counts_by_fc, paste0(data_folder, "/processed/mis_census_counts_by_fc.csv"), na = "")
-
-  rlog::log_info("Writing mis_census_counts_by_service.csv")
-
-  mis_census_counts_by_service <- census_table(daily_service, "service") |>
-    dplyr::mutate(funder_service_key = paste0(funder_service_code, "_", service_name, "_", funder_statistical_account_code))
-
-  readr::write_csv(mis_census_counts_by_service, paste0(data_folder, "/processed/mis_census_counts_by_service.csv"), na = "")
-
-  invisible(list(mis_census_counts_by_fc = mis_census_counts_by_fc,
-                 mis_census_counts_by_service = mis_census_counts_by_service))
+  list(fc = census_by_fc, service = census_rows(daily_service, "service"))
 }

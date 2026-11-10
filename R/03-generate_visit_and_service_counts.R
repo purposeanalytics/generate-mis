@@ -804,7 +804,7 @@ generate_visit_and_service_counts <- function(processed_data,
   rlog::log_info("Writing mis_visit_and_service_counts_by_fc.csv")
 
   mis_visit_and_service_counts_by_fc <- summarise_detail(detail_fc, "fc") |>
-    dplyr::mutate(funder_key = paste0(funder_service_code, "_", funder_statistical_account_code))
+    add_funder_key("fc")
 
   check_accounts(mis_visit_and_service_counts_by_fc, "mis_visit_and_service_counts_by_fc")
   readr::write_csv(mis_visit_and_service_counts_by_fc, paste0(data_folder, "/processed/mis_visit_and_service_counts_by_fc.csv"), na = "")
@@ -812,15 +812,12 @@ generate_visit_and_service_counts <- function(processed_data,
   rlog::log_info("Writing mis_visit_and_service_counts_by_service.csv")
 
   mis_visit_and_service_counts_by_service <- summarise_detail(detail_service, "service") |>
-    dplyr::mutate(funder_service_key = paste0(funder_service_code, "_", service_name, "_", funder_statistical_account_code))
+    add_funder_key("service")
 
   readr::write_csv(mis_visit_and_service_counts_by_service, paste0(data_folder, "/processed/mis_visit_and_service_counts_by_service.csv"), na = "")
 
   invisible(list(mis_visit_and_service_counts_by_fc = mis_visit_and_service_counts_by_fc,
                  mis_visit_and_service_counts_by_service = mis_visit_and_service_counts_by_service,
-                 mis_detail_by_fc = add_aggregation(detail_fc) |>
-                   dplyr::mutate(funder_key = paste0(funder_service_code, "_", funder_statistical_account_code)),
-                 mis_detail_by_service = add_aggregation(detail_service) |>
-                   dplyr::mutate(funder_service_key = paste0(funder_service_code, "_", service_name, "_",
-                                                             funder_statistical_account_code))))
+                 detail_by_fc = add_aggregation(detail_fc) |> add_funder_key("fc"),
+                 detail_by_service = add_aggregation(detail_service) |> add_funder_key("service")))
 }

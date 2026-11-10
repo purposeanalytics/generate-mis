@@ -1,6 +1,6 @@
-# Detail tables: the rows behind the visit and service counts (date, unit, account,
-# aggregation, client, reference, value), which are their sums. The census tables are
-# themselves one row per client per day.
+# Detail tables: the rows behind every statistic (date, unit, account, aggregation, client,
+# reference, value, key). Census statistics are one row per client per day; the visit and
+# service summaries are the sums of their rows.
 
 statistic_of <- function(account) substr(account, 1, 3)
 
@@ -32,27 +32,28 @@ test_that("visit and service detail adds up to the summary rows, by FC and by se
   }
 })
 
-test_that("census tables are one row per client per day, with value 1", {
+test_that("census rows in the detail are one row per client per day, with value 1", {
   for (version in c("verA", "verB", "verC")) {
     out <- run_mis(fc_455_version = version)
-    for (census in list(out$mis_census_counts_by_fc, out$mis_census_counts_by_service)) {
+    for (detail in list(out$mis_detail_by_fc, out$mis_detail_by_service)) {
+      census <- detail[detail$aggregation != "sum_visits_and_services", ]
+      expect_gt(nrow(census), 0)
       expect_false(anyNA(census$participant_id))
       expect_true(all(census$value == 1))
-      expect_false(anyNA(census$aggregation))
-      expect_equal(nrow(dplyr::distinct(dplyr::select(census, -dplyr::any_of(c("funder_key", "funder_service_key"))))),
-                   nrow(census))
+      expect_true(all(is.na(census$reference)))
+      expect_equal(nrow(dplyr::distinct(census)), nrow(census))
     }
   }
 })
 
-test_that("detail and census tables carry the aggregation type of each statistic", {
-  out <- run_mis()
-  census <- out$mis_census_counts_by_fc
-  agg <- function(stat) unique(census$aggregation[statistic_of(census$funder_statistical_account_code) == stat])
+test_that("detail carries the aggregation type of each statistic", {
+  detail <- run_mis()$mis_detail_by_fc
+  expect_false(anyNA(detail$aggregation))
+  agg <- function(stat) unique(detail$aggregation[statistic_of(detail$funder_statistical_account_code) == stat])
   expect_equal(agg("403"), "sum_census")
   expect_equal(agg("406"), "end_of_period")
   expect_equal(agg("455"), "distinct_cumulative")
-  expect_true(all(out$mis_detail_by_fc$aggregation == "sum_visits_and_services"))
+  expect_equal(agg("450"), "sum_visits_and_services")
 })
 
 test_that("detail has the same few columns at both grains", {
@@ -63,13 +64,17 @@ test_that("detail has the same few columns at both grains", {
   expect_equal(names(out$mis_detail_by_service),
                c("date", "funder_service_code", "service_name", "funder_statistical_account_code", "aggregation",
                  "participant_id", "reference", "value", "funder_service_key"))
-  # the keys match the summary tables', so the detail joins to the same funder codes rows
-  expect_true(all(out$mis_detail_by_fc$funder_key %in% out$mis_visit_and_service_counts_by_fc$funder_key))
-  expect_true(all(out$mis_detail_by_service$funder_service_key %in%
-                    out$mis_visit_and_service_counts_by_service$funder_service_key))
+  # the keys are built as in the summary tables, so the detail joins to the funder codes tables
+  fc <- out$mis_detail_by_fc
+  expect_equal(fc$funder_key, paste0(fc$funder_service_code, "_", fc$funder_statistical_account_code))
+  service <- out$mis_detail_by_service
+  expect_equal(service$funder_service_key,
+               paste0(service$funder_service_code, "_", service$service_name, "_", service$funder_statistical_account_code))
+  visit_keys <- out$mis_visit_and_service_counts_by_fc$funder_key
+  expect_true(all(visit_keys %in% fc$funder_key))
   # every statistic in the visit and service table has detail rows
-  expect_setequal(unique(statistic_of(out$mis_detail_by_fc$funder_statistical_account_code)),
-                  unique(statistic_of(out$mis_visit_and_service_counts_by_fc$funder_statistical_account_code)))
+  expect_true(all(unique(statistic_of(out$mis_visit_and_service_counts_by_fc$funder_statistical_account_code)) %in%
+                    statistic_of(out$mis_detail_by_fc$funder_statistical_account_code)))
 })
 
 test_that("episode detail references the enrollment", {
@@ -146,12 +151,8 @@ test_that("group detail: hours shared across participants, sessions reference th
   expect_true(is.na(session$participant_id))
 })
 
-test_that("detail files are written only when asked for", {
-  default <- run_mis()
-  expect_false(any(file.exists(file.path(attr(default, "data_folder"), "processed",
-                                         c("mis_detail_by_fc.csv", "mis_detail_by_service.csv")))))
-
-  out <- run_mis(detail = TRUE)
+test_that("detail files are written", {
+  out <- run_mis()
   for (name in c("mis_detail_by_fc", "mis_detail_by_service")) {
     path <- file.path(attr(out, "data_folder"), "processed", paste0(name, ".csv"))
     expect_true(file.exists(path))

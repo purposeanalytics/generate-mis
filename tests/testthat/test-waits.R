@@ -17,7 +17,7 @@ test_that("S407 25 20 counts waitlist days only, reported when service starts", 
 })
 
 test_that("S406 counts people still waiting at the end of the period, from their second day", {
-  census <- run_mis()$mis_census_counts_by_fc
+  census <- run_mis()$mis_detail_by_fc
   # P3 has been waiting for assessment since Sep 1
   expect_equal(value_on(census, mh_fc, "406 99 10", "2025-09-30"), 1)
   expect_equal(value_on(census, mh_fc, "406 99 10", "2025-09-01"), 0)

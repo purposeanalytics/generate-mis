@@ -10,7 +10,7 @@ test_that("records dated after report_date are ignored", {
   # even though the data shows it starting on May 1
   out <- run_mis(report_date = "2025-04-30")
   fc <- out$mis_visit_and_service_counts_by_fc
-  expect_equal(value_on(out$mis_census_counts_by_fc, mh_fc, "406 25 20", "2025-04-30"), 1)
+  expect_equal(value_on(out$mis_detail_by_fc, mh_fc, "406 25 20", "2025-04-30"), 1)
   expect_equal(value_total(fc, mh_fc, "407 25 20"), 0)
   expect_false(any(fc$date > as.Date("2025-04-30")))
   # P4's acceptance on Jun 1 hasn't happened yet

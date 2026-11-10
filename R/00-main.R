@@ -12,14 +12,13 @@
 #'     the day the client goes on hold is still counted as Active (a hold is a temporary
 #'     absence, not a separation).
 #' @param debug
-#' @param detail If TRUE, also write the detail tables (`mis_detail_by_fc.csv` and
-#'   `mis_detail_by_service.csv`) to `data/processed`. They name the clients behind each
-#'   statistic, so they are off by default; share them only with people who check the data.
 #'
-#' @return Invisibly, a list of the four tables written to `data/processed`, plus
-#'   `mis_detail_by_fc` and `mis_detail_by_service`: the rows behind the visit and service
-#'   counts, one per counted unit (episode, visit or session). These are written to files only
-#'   when `detail = TRUE`. The census tables are already one row per client per day.
+#' @return Invisibly, a list of the four tables written to `data/processed`:
+#'   - `mis_detail_by_fc` and `mis_detail_by_service`: one row per counted unit for every
+#'     statistic (a client day for census statistics; an episode, visit or session for the
+#'     others), with the client. They name clients, so restrict who can see them.
+#'   - `mis_visit_and_service_counts_by_fc` and `mis_visit_and_service_counts_by_service`:
+#'     the visit and service statistics summed by date, reporting unit and account.
 #' @export
 #'
 #' @examples
@@ -30,8 +29,7 @@ generate_tables <- function(data_folder = here::here("data"),
                             ir_version = "verCMHA",
                             report_date = lubridate::today(),
                             hold_day_version = "verA",
-                            debug = FALSE,
-                            detail = FALSE) {
+                            debug = FALSE) {
 
   report_date <- as.Date(report_date)
 
@@ -45,20 +43,20 @@ generate_tables <- function(data_folder = here::here("data"),
   census_counts <- generate_census_counts(processed_data, fc_455_version, fc_450_version)
   visit_and_service_counts <- generate_visit_and_service_counts(processed_data, fc_450_version, fc_506_version, ir_version)
 
-  # visit and service detail; the census tables are already one row per client per day
-  details <- visit_and_service_counts[c("mis_detail_by_fc", "mis_detail_by_service")]
-  summaries <- c(census_counts, visit_and_service_counts[setdiff(names(visit_and_service_counts), names(details))])
-
-  if (isTRUE(detail)) {
-    for (name in names(details)) {
-      rlog::log_info(glue::glue("Writing {name}.csv (contains client IDs)"))
-      readr::write_csv(details[[name]], file.path(data_folder, "processed", paste0(name, ".csv")), na = "")
-    }
+  # One detail table per grain: the census rows, then the visit and service rows
+  details <- list(
+    mis_detail_by_fc = dplyr::bind_rows(census_counts$fc, visit_and_service_counts$detail_by_fc),
+    mis_detail_by_service = dplyr::bind_rows(census_counts$service, visit_and_service_counts$detail_by_service)
+  )
+  for (name in names(details)) {
+    rlog::log_info(glue::glue("Writing {name}.csv (contains client IDs)"))
+    readr::write_csv(details[[name]], file.path(data_folder, "processed", paste0(name, ".csv")), na = "")
   }
+  summaries <- visit_and_service_counts[c("mis_visit_and_service_counts_by_fc", "mis_visit_and_service_counts_by_service")]
 
   rlog::log_info("MIS table generation complete!")
 
   tictoc::toc()
 
-  invisible(c(summaries, details))
+  invisible(c(details, summaries))
 }

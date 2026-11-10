@@ -3,7 +3,7 @@
 # P14 and P15 are assisted living clients discharged on Jun 17 and Jun 24.
 
 census <- function(version) {
-  run_mis(hold_day_version = version)$mis_census_counts_by_fc
+  run_mis(hold_day_version = version)$mis_detail_by_fc
 }
 
 test_that("verA does not count the day a client goes on hold", {

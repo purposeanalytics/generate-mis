@@ -76,10 +76,6 @@ This can take one of two conditions which assigns either CMHA or CSS statistical
 
 The date the run is "as at". It defaults to today. Records dated after it are ignored: service statuses that start later and activities on later dates are dropped, and decision or first-service dates that fall later are treated as not yet known. Statuses that are still open are treated as running to the day after this date.
 
-**detail**
-
-`TRUE` also writes the detail tables, `mis_detail_by_fc.csv` and `mis_detail_by_service.csv`, to `data/processed` (see [Detail tables](#detail-tables)). They name the clients behind each statistic, so they are off by default.
-
 ## Input files
 
 `generate_tables()` reads four files from `data_folder/interim/rds/`. If a **required** column is missing, the run stops with an error that names it. If an **expected** column is missing, the run warns and carries on with that column blank, so the statistics shown will be undercounted. Exports should always include the expected columns.
@@ -132,22 +128,22 @@ Language and special needs are recorded once per participant and read from parti
 
 ## Detail tables
 
-The detail tables list the rows behind the visit and service counts, so a count can be traced back to the clients and records it came from. There is one table per reporting level, like the summary tables: `mis_detail_by_fc.csv` and `mis_detail_by_service.csv`. Filter on an account and a date range to see who was counted. The visit and service summary tables are the sums of their detail rows (the tests check this).
+The detail tables list the rows behind every statistic, so a count can be traced back to the clients and records it came from. There is one table per reporting level: `mis_detail_by_fc.csv` and `mis_detail_by_service.csv`. Filter on an account, a functional centre, a client or a date range to see who was counted. The census statistics (S403, S406, S455, S855, S950, S955) are reported only here, as one row per client per day. The visit and service statistics are also summed in `mis_visit_and_service_counts_by_fc.csv` and `mis_visit_and_service_counts_by_service.csv`, which are the sums of their detail rows (the tests check this).
 
-They contain client identifiers. Write them only when needed (`detail = TRUE`), and restrict who can see them in the Power BI report.
+They contain client identifiers, so restrict who can see them in the Power BI report.
 
 | Column | Meaning |
 |---|---|
 | `date` | The date the row counts on, as in the summary tables |
 | `funder_service_code`, `service_name` | Where it is reported (`service_name` in the by-service table only) |
 | `funder_statistical_account_code` | The account (its first three digits are the statistic) |
-| `aggregation` | How the statistic totals (as in `service_list.csv`); for these statistics, always by adding up `value` |
+| `aggregation` | How the statistic totals over a period (as in `service_list.csv`; see below) |
 | `participant_id` | The client. Blank for group sessions (S266, S492); "Unregistered" for not uniquely identified contacts |
-| `reference` | The record to look up: the enrollment for episodes, waits, admissions and discharges (all of them, e.g. `E1, E2`, when overlapping enrollments in the FC were merged into one episode); the activity for visit statistics; the group session for S266 and S492 |
-| `value` | What the row adds: 1 for a count, or days, hours, meals or interactions |
+| `reference` | The record to look up (blank for census statistics): the enrollment for episodes, waits, admissions and discharges (all of them, e.g. `E1, E2`, when overlapping enrollments in the FC were merged into one episode); the activity for visit statistics; the group session for S266 and S492 |
+| `value` | What the row adds: 1 for a count or a client day, or days, hours, meals or interactions |
 | `funder_key`, `funder_service_key` | The key to the funder codes table, as in the summary tables (`funder_service_key` in the by-service table only) |
 
-The census statistics (S403, S406, S455, S855, S950, S955) need no separate detail table: `mis_census_counts_by_fc.csv` and `mis_census_counts_by_service.csv` are already one row per client per day, with a `value` of 1 and an `aggregation` column. To total them over a period: add up `value` for S403 (`sum_census`); add up `value` on the last day of the period for S406 (`end_of_period`); count distinct `participant_id` for S455, S855, S950 and S955 (`distinct_cumulative`).
+To total a statistic over a period, follow its `aggregation`: add up `value` for visit and service statistics (`sum_visits_and_services`) and S403 (`sum_census`); add up `value` on the last day of the period for S406 (`end_of_period`); count distinct `participant_id` for S455, S855, S950 and S955 (`distinct_cumulative`).
 
 ## Tests
 

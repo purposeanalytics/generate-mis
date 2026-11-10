@@ -429,6 +429,17 @@ add_aggregation <- function(df) {
     dplyr::relocate(aggregation, .after = funder_statistical_account_code)
 }
 
+# Add the key to the funder codes table, as the last column: funder_key (FC and account) by
+# FC, funder_service_key (FC, service and account) by service
+add_funder_key <- function(df, grain) {
+  if (grain == "fc") {
+    dplyr::mutate(df, funder_key = paste0(funder_service_code, "_", funder_statistical_account_code))
+  } else {
+    dplyr::mutate(df, funder_service_key = paste0(funder_service_code, "_", service_name, "_",
+                                                  funder_statistical_account_code))
+  }
+}
+
 # Summary rows (date, reporting unit, account, value) from detail rows
 summarise_detail <- function(detail, grain) {
   detail |>
