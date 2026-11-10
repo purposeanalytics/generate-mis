@@ -139,7 +139,8 @@ They contain client identifiers, so restrict who can see them in the Power BI re
 | `funder_statistical_account_code` | The account (its first three digits are the statistic) |
 | `aggregation` | How the statistic totals over a period (as in `service_list.csv`; see below) |
 | `participant_id` | The client. Blank for group sessions (S266, S492); "Unregistered" for not uniquely identified contacts |
-| `reference` | The record to look up (blank for census statistics): the enrollment for episodes, waits, admissions and discharges (all of them, e.g. `E1, E2`, when overlapping enrollments in the FC were merged into one episode); the activity for visit statistics; the group session for S266 and S492 |
+| `reference_id` | The record(s) to look up, comma-separated when there are several: the enrollment for episodes, waits, admissions and discharges (all of them, e.g. `E1, E2`, when overlapping enrollments in the FC were merged into one episode); the activity for visit statistics; the group session for S266, S491, S492 and group rows of S454, so one filter shows a whole session. For census statistics: the enrollment(s) the client was on that day for S403 and S406; for S455, S855, S950 and S955, the visit(s) that made them count that day (`fc_455_version` verA and verB) or their active enrollment(s) (verC) |
+| `reference_note` | When the wait or episode in `reference_id` began: `Wait started YYYY-MM-DD` for S407 and S407 99; `Episode started YYYY-MM-DD` for S401, S410, S411, S489, S501, S506, S511 and S513 (`Active period started` for S506 under `fc_506_version = "verB"`). Blank for visits, sessions and census days |
 | `value` | What the row adds: 1 for a count or a client day, or days, hours, meals or interactions |
 | `funder_key`, `funder_service_key` | The key to the funder codes table, as in the summary tables (`funder_service_key` in the by-service table only) |
 

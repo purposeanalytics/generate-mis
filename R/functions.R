@@ -405,11 +405,44 @@ overlap_grouping <- function(merge_level) {
 #   interactions)
 # - reference: the record to look up in the source system: the enrollment for episode and
 #   wait statistics, the activity for visit statistics, the group session for session counts
-detail_by_grain <- function(df, grain, value = 1L, reference = NA_character_) {
+detail_by_grain <- function(df, grain, value = 1L, reference = NA_character_, note = NA_character_) {
   df |>
-    dplyr::mutate(value = {{ value }}, reference = as.character({{ reference }})) |>
+    dplyr::mutate(value = {{ value }}, reference_id = as.character({{ reference }}),
+                  reference_note = as.character({{ note }})) |>
     dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code,
-                  dplyr::any_of("participant_id"), reference, value)
+                  dplyr::any_of("participant_id"), reference_id, reference_note, value)
+}
+
+# Note for reference_note, e.g. "Wait started 2025-04-01" (NA when there is no date)
+started_note <- function(what, date) {
+  dplyr::if_else(is.na(date), NA_character_, paste(what, "started", format(date, "%Y-%m-%d")))
+}
+
+# One row per `keys`, with the IDs in column `id` as one comma-separated `reference` (in order
+# of appearance, no repeats; NA if none). `id` can already hold such lists, which are merged.
+# Most keys have one ID, so only those with several are pasted together.
+collapse_ids <- function(df, keys, id) {
+  rows <- df |>
+    dplyr::distinct(dplyr::pick(dplyr::all_of(c(keys, id)))) |>
+    dplyr::mutate(reference = as.character(.data[[id]])) |>
+    dplyr::select(dplyr::all_of(keys), reference) |>
+    dplyr::mutate(.n = dplyr::n(), .by = dplyr::all_of(keys))
+
+  several <- rows |>
+    dplyr::filter(.n > 1) |>
+    dplyr::summarize(reference = merge_id_lists(reference), .by = dplyr::all_of(keys))
+
+  dplyr::bind_rows(dplyr::select(dplyr::filter(rows, .n == 1), -.n), several)
+}
+
+# Reference for group attendance: the group session, or the activity if it has no group ID
+group_reference <- function(group_id, activity_id) {
+  dplyr::coalesce(as.character(group_id), as.character(activity_id))
+}
+
+merge_id_lists <- function(x) {
+  ids <- unique(unlist(strsplit(x[!is.na(x)], ", ", fixed = TRUE)))
+  if (length(ids) == 0) NA_character_ else paste(ids, collapse = ", ")
 }
 
 # NA as zero, keeping the type (a missing count or duration adds nothing to a sum, as

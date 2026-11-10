@@ -1,5 +1,5 @@
 # Detail tables: the rows behind every statistic (date, unit, account, aggregation, client,
-# reference, value, key). Census statistics are one row per client per day; the visit and
+# reference ID and note, value, key). Census statistics are one row per client per day; the visit and
 # service summaries are the sums of their rows.
 
 statistic_of <- function(account) substr(account, 1, 3)
@@ -40,7 +40,8 @@ test_that("census rows in the detail are one row per client per day, with value 
       expect_gt(nrow(census), 0)
       expect_false(anyNA(census$participant_id))
       expect_true(all(census$value == 1))
-      expect_true(all(is.na(census$reference)))
+      expect_false(anyNA(census$reference_id))
+      expect_true(all(is.na(census$reference_note)))
       expect_equal(nrow(dplyr::distinct(census)), nrow(census))
     }
   }
@@ -60,10 +61,10 @@ test_that("detail has the same few columns at both grains", {
   out <- run_mis()
   expect_equal(names(out$mis_detail_by_fc),
                c("date", "funder_service_code", "funder_statistical_account_code", "aggregation",
-                 "participant_id", "reference", "value", "funder_key"))
+                 "participant_id", "reference_id", "reference_note", "value", "funder_key"))
   expect_equal(names(out$mis_detail_by_service),
                c("date", "funder_service_code", "service_name", "funder_statistical_account_code", "aggregation",
-                 "participant_id", "reference", "value", "funder_service_key"))
+                 "participant_id", "reference_id", "reference_note", "value", "funder_service_key"))
   # the keys are built as in the summary tables, so the detail joins to the funder codes tables
   fc <- out$mis_detail_by_fc
   expect_equal(fc$funder_key, paste0(fc$funder_service_code, "_", fc$funder_statistical_account_code))
@@ -84,7 +85,7 @@ test_that("episode detail references the enrollment", {
   # R3: back on the waitlist Jun 23, so discharged that day (S513) and referred again (S489)
   discharge <- detail[detail$participant_id %in% "R3" & stat == "513", ]
   expect_equal(discharge$date, as.Date("2025-06-23"))
-  expect_equal(discharge$reference, "E15")
+  expect_equal(discharge$reference_id, "E15")
   expect_equal(sort(detail$date[detail$participant_id %in% "R3" & stat == "489"]),
                as.Date(c("2025-04-21", "2025-06-23")))
 
@@ -92,7 +93,7 @@ test_that("episode detail references the enrollment", {
   r2 <- detail[detail$participant_id %in% "R2" & detail$funder_service_code == "82 9 90", ]
   r2_stat <- statistic_of(r2$funder_statistical_account_code)
   expect_equal(r2$date[r2_stat == "511"], as.Date("2025-06-09"))
-  expect_equal(r2$reference[r2_stat == "511"], "E14")
+  expect_equal(r2$reference_id[r2_stat == "511"], "E14")
   expect_true(as.Date("2025-07-07") %in% r2$date[r2_stat == "501"])
 })
 
@@ -130,7 +131,7 @@ test_that("visit detail references the activity that was counted", {
   on_day <- detail$participant_id %in% "P1" & detail$date == as.Date("2025-05-05")
   visit <- detail[on_day & stat == "450", ]
   expect_equal(nrow(visit), 1)
-  expect_equal(activities$activity_type[activities$activity_id == visit$reference], "Face-to-face")
+  expect_equal(activities$activity_type[activities$activity_id == visit$reference_id], "Face-to-face")
   expect_equal(sum(detail$value[on_day & stat == "265"]), 2)
   expect_equal(nrow(detail[on_day & stat == "265", ]), 2)
 })
@@ -147,8 +148,56 @@ test_that("group detail: hours shared across participants, sessions reference th
   # S492: one session row, referencing the group, with no client
   session <- on_day[stat == "492", ]
   expect_equal(nrow(session), 1)
-  expect_equal(session$reference, "G1")
+  expect_equal(session$reference_id, "G1")
   expect_true(is.na(session$participant_id))
+
+  # attendance (S491) and hours (S454) reference the session too, so one filter shows it all
+  expect_equal(unique(on_day$reference_id[stat %in% c("454", "491")]), "G1")
+})
+
+test_that("census rows reference the enrollment, or the visit that made the client count", {
+  ids <- function(x) unique(unlist(strsplit(x, ", ", fixed = TRUE)))
+  activity_ids <- fixture_activities()$activity_id
+  enrollment_ids <- fixture_services()$service_enrollment_id
+
+  for (version in c("verA", "verB", "verC")) {
+    detail <- run_mis(fc_455_version = version)$mis_detail_by_fc
+    stat <- statistic_of(detail$funder_statistical_account_code)
+    # S403 and S406: the enrollment the client was on
+    expect_true(all(ids(detail$reference_id[stat %in% c("403", "406")]) %in% enrollment_ids))
+    # served statistics: the visits (verA, verB), or the active enrollment (verC)
+    served <- ids(detail$reference_id[stat %in% c("455", "855", "950", "955")])
+    expect_gt(length(served), 0)
+    expect_true(all(served %in% if (version == "verC") enrollment_ids else activity_ids), info = version)
+  }
+})
+
+test_that("reference note: when the wait or episode began", {
+  detail <- run_mis()$mis_detail_by_fc
+  stat <- statistic_of(detail$funder_statistical_account_code)
+  note <- detail$reference_note
+  started <- function(rows) as.Date(substring(rows$reference_note, nchar(rows$reference_note) - 9))
+  days <- function(rows) as.numeric(rows$date - started(rows))
+
+  # assessment wait: dated at the decision, so the value is the days since the wait started
+  assessment <- detail[detail$funder_statistical_account_code == "407 99 10", ]
+  expect_gt(nrow(assessment), 0)
+  expect_true(all(startsWith(assessment$reference_note, "Wait started ")))
+  expect_equal(assessment$value, days(assessment))
+
+  # wait for service: dated at service start; hold days aren't counted, so the value can be less
+  wait <- detail[stat == "407" & detail$funder_statistical_account_code != "407 99 10", ]
+  expect_gt(nrow(wait), 0)
+  expect_true(all(startsWith(wait$reference_note, "Wait started ")))
+  expect_true(all(wait$value <= days(wait)))
+
+  # episodes: every row notes an episode start on or before its date
+  episodes <- detail[stat %in% c("401", "410", "411", "489", "501", "506", "511", "513"), ]
+  expect_true(all(startsWith(episodes$reference_note, "Episode started ")))
+  expect_true(all(started(episodes) <= episodes$date))
+
+  # everything else has no note
+  expect_true(all(is.na(note[!stat %in% c("401", "407", "410", "411", "489", "501", "506", "511", "513")])))
 })
 
 test_that("detail files are written", {

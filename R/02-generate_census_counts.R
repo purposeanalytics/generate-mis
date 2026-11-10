@@ -53,11 +53,12 @@ generate_census_counts <- function(processed_data,
     mis_daily_census |>
       filter_eligible("403") |>
       dplyr::filter(service_status == "Active") |>
-      dplyr::distinct(dplyr::pick(dplyr::all_of(c("participant_id", "participant_funder_age_group_code", grain_cols(grain), "date")))) |>
+      # reference: the enrollment(s) the client was on that day
+      collapse_ids(c("participant_id", "participant_funder_age_group_code", grain_cols(grain), "date"), "service_enrollment_id") |>
       add_statistical_account(statistic = "403",
                               sr_category = default_sr_category(funder_service_code),
                               detail = participant_funder_age_group_code) |>
-      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id)
+      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id, reference)
   }
 
 
@@ -74,11 +75,11 @@ generate_census_counts <- function(processed_data,
       dplyr::filter(service_status == "On Waitlist") |>
       # exclude first day of wait where duration is zero -- only count on waitlist if they wait one day or more
       dplyr::filter(service_status_start_date != date) |>
-      dplyr::distinct(dplyr::pick(dplyr::all_of(c("date", "participant_id", grain_cols(grain), "service_status")))) |>
+      collapse_ids(c("date", "participant_id", grain_cols(grain), "service_status"), "service_enrollment_id") |>
       add_statistical_account(statistic = "406",
                               sr_category = default_sr_category(funder_service_code),
                               detail = "20") |>
-      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id)
+      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id, reference)
   }
 
 
@@ -98,11 +99,11 @@ generate_census_counts <- function(processed_data,
       dplyr::filter(service_status == "Waiting for Assessment") |>
       # exclude first day of wait where duration is zero -- only count as waiting for assessment if they wait one day or more
       dplyr::filter(service_status_start_date != date) |>
-      dplyr::distinct(dplyr::pick(dplyr::all_of(c("date", "participant_id", grain_cols(grain), "service_status")))) |>
+      collapse_ids(c("date", "participant_id", grain_cols(grain), "service_status"), "service_enrollment_id") |>
       add_statistical_account(statistic = "406",
                               sr_category = "99",
                               detail = "10") |>
-      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id)
+      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id, reference)
   }
 
 
@@ -115,6 +116,8 @@ generate_census_counts <- function(processed_data,
   # source is used; `cols` are the columns to keep besides date and participant_id.
   # Under verB, language and special needs come from the visit records; otherwise from the
   # participant record (via the daily census).
+  # reference: the visit(s) that made the client count that day (verA, verB), or the
+  # enrollment(s) they were active on (verC).
   served_days <- function(cols, keep = identity, match_on = character(0)) {
     id_cols <- c("date", "participant_id", cols)
 
@@ -122,19 +125,28 @@ generate_census_counts <- function(processed_data,
       mis_visits |>
         keep() |>
         dplyr::rename(date = activity_date) |>
-        dplyr::distinct(dplyr::pick(dplyr::all_of(id_cols)))
+        collapse_ids(id_cols, "activity_id")
     }
 
     active_days <- function() {
       mis_daily_census |>
         dplyr::filter(service_status == "Active") |>
         keep() |>
-        dplyr::distinct(dplyr::pick(dplyr::all_of(id_cols)))
+        collapse_ids(id_cols, "service_enrollment_id")
+    }
+
+    # active days with a visit that day (matched on `match_on`), referencing those visits
+    active_days_with_visit <- function() {
+      visits <- mis_visits |>
+        dplyr::rename(date = activity_date) |>
+        collapse_ids(c("date", "participant_id", match_on), "activity_id")
+      active_days() |>
+        dplyr::select(-reference) |>
+        dplyr::inner_join(visits, by = c("date", "participant_id", match_on))
     }
 
     switch(fc_455_version,
-           verA = active_days() |>
-             dplyr::semi_join(mis_visits, by = c("date" = "activity_date", "participant_id", match_on)),
+           verA = active_days_with_visit(),
            verB = visit_days(),
            verC = active_days())
   }
@@ -158,7 +170,7 @@ generate_census_counts <- function(processed_data,
       add_statistical_account(statistic = "455",
                               sr_category = default_sr_category(funder_service_code),
                               detail = participant_funder_age_group_code) |>
-      dplyr::select(date, dplyr::all_of(keys), funder_statistical_account_code, participant_id)
+      dplyr::select(date, dplyr::all_of(keys), funder_statistical_account_code, participant_id, reference)
   }
 
 
@@ -181,7 +193,7 @@ generate_census_counts <- function(processed_data,
     add_statistical_account(statistic = "855",
                             sr_category = "80",
                             detail = paste0("5", age_digit(participant_funder_age_group_code))) |>
-    dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
+    dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id, reference)
 
   # CMH&A: one count per fund type, in the organizational AC for that fund type (AC 82 9 90, 83 9 90)
   calc_org_855_cmha <- served_days(c("fund_type", "participant_funder_age_group_code"),
@@ -192,7 +204,7 @@ generate_census_counts <- function(processed_data,
     add_statistical_account(statistic = "855",
                             sr_category = "25",
                             detail = paste0("5", age_digit(participant_funder_age_group_code))) |>
-    dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
+    dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id, reference)
 
 
   # S950 ** 10 Francophone Individuals Requested Service/Served in French (4th, 5th = SR code) ----
@@ -216,7 +228,7 @@ generate_census_counts <- function(processed_data,
     add_statistical_account(statistic = "950",
                             sr_category = "10",
                             detail = "80") |>
-    dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id)
+    dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id, reference)
 
   # Functional centre: S950 80 10
   calc_950 <- function(grain) {
@@ -225,7 +237,7 @@ generate_census_counts <- function(processed_data,
       add_statistical_account(statistic = "950",
                               sr_category = "80",
                               detail = "10") |>
-      dplyr::select(date, dplyr::all_of(keys), funder_statistical_account_code, participant_id)
+      dplyr::select(date, dplyr::all_of(keys), funder_statistical_account_code, participant_id, reference)
   }
 
 
@@ -269,7 +281,7 @@ generate_census_counts <- function(processed_data,
                                                           stringr::str_detect(funder_service_code, "^7[23] 5 82 45") ~ "22",
                                                         participant_ohrs_special_needs == "High Risk Senior" ~ "20",
                                                         participant_ohrs_special_needs == "Living With Effects Of HIV-AIDS" ~ "25")) |>
-      dplyr::select(date, dplyr::all_of(keys), funder_statistical_account_code, participant_id)
+      dplyr::select(date, dplyr::all_of(keys), funder_statistical_account_code, participant_id, reference)
   }
 
 
@@ -287,8 +299,8 @@ generate_census_counts <- function(processed_data,
   # generate_tables() adds them to the visit and service detail and writes the files.
   census_rows <- function(daily, grain) {
     daily |>
-      dplyr::distinct() |>
-      detail_by_grain(grain) |>
+      collapse_ids(c("date", grain_cols(grain), "funder_statistical_account_code", "participant_id"), "reference") |>
+      detail_by_grain(grain, reference = reference) |>
       add_aggregation() |>
       add_funder_key(grain)
   }
