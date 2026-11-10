@@ -59,10 +59,14 @@ test_that("detail has the same few columns at both grains", {
   out <- run_mis()
   expect_equal(names(out$mis_detail_by_fc),
                c("date", "funder_service_code", "funder_statistical_account_code", "aggregation",
-                 "participant_id", "reference", "value"))
+                 "participant_id", "reference", "value", "funder_key"))
   expect_equal(names(out$mis_detail_by_service),
                c("date", "funder_service_code", "service_name", "funder_statistical_account_code", "aggregation",
-                 "participant_id", "reference", "value"))
+                 "participant_id", "reference", "value", "funder_service_key"))
+  # the keys match the summary tables', so the detail joins to the same funder codes rows
+  expect_true(all(out$mis_detail_by_fc$funder_key %in% out$mis_visit_and_service_counts_by_fc$funder_key))
+  expect_true(all(out$mis_detail_by_service$funder_service_key %in%
+                    out$mis_visit_and_service_counts_by_service$funder_service_key))
   # every statistic in the visit and service table has detail rows
   expect_setequal(unique(statistic_of(out$mis_detail_by_fc$funder_statistical_account_code)),
                   unique(statistic_of(out$mis_visit_and_service_counts_by_fc$funder_statistical_account_code)))

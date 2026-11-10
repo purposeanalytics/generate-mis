@@ -145,6 +145,7 @@ They contain client identifiers. Write them only when needed (`detail = TRUE`), 
 | `participant_id` | The client. Blank for group sessions (S266, S492); "Unregistered" for not uniquely identified contacts |
 | `reference` | The record to look up: the enrollment for episodes, waits, admissions and discharges (all of them, e.g. `E1, E2`, when overlapping enrollments in the FC were merged into one episode); the activity for visit statistics; the group session for S266 and S492 |
 | `value` | What the row adds: 1 for a count, or days, hours, meals or interactions |
+| `funder_key`, `funder_service_key` | The key to the funder codes table, as in the summary tables (`funder_service_key` in the by-service table only) |
 
 The census statistics (S403, S406, S455, S855, S950, S955) need no separate detail table: `mis_census_counts_by_fc.csv` and `mis_census_counts_by_service.csv` are already one row per client per day, with a `value` of 1 and an `aggregation` column. To total them over a period: add up `value` for S403 (`sum_census`); add up `value` on the last day of the period for S406 (`end_of_period`); count distinct `participant_id` for S455, S855, S950 and S955 (`distinct_cumulative`).
 

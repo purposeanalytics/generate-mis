@@ -818,6 +818,9 @@ generate_visit_and_service_counts <- function(processed_data,
 
   invisible(list(mis_visit_and_service_counts_by_fc = mis_visit_and_service_counts_by_fc,
                  mis_visit_and_service_counts_by_service = mis_visit_and_service_counts_by_service,
-                 mis_detail_by_fc = add_aggregation(detail_fc),
-                 mis_detail_by_service = add_aggregation(detail_service)))
+                 mis_detail_by_fc = add_aggregation(detail_fc) |>
+                   dplyr::mutate(funder_key = paste0(funder_service_code, "_", funder_statistical_account_code)),
+                 mis_detail_by_service = add_aggregation(detail_service) |>
+                   dplyr::mutate(funder_service_key = paste0(funder_service_code, "_", service_name, "_",
+                                                             funder_statistical_account_code))))
 }
