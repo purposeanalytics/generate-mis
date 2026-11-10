@@ -6,7 +6,10 @@
 #' @export
 #'
 #' @examples
-process_data <- function(data_folder, debug = FALSE, report_date = lubridate::today()){
+process_data <- function(data_folder, debug = FALSE, report_date = lubridate::today(),
+                         hold_day_version = "verA"){
+
+  hold_day_version <- match.arg(hold_day_version, c("verA", "verB"))
 
   # Read data ----
 
@@ -126,16 +129,27 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
     dplyr::filter(activity_status == "Completed" & participant_id == "Unregistered")
 
 
-  rlog::log_info("Building MIS daily census table")
+  rlog::log_info(glue::glue("Building MIS daily census table (hold_day_version = '{hold_day_version}')"))
 
   mis_daily_census <- mis_service_history |>
+    # the status that follows each one, for hold_day_version
+    dplyr::group_by(service_enrollment_id) |>
+    dplyr::arrange(service_status_start_date, service_status, .by_group = TRUE) |>
+    dplyr::mutate(next_service_status = dplyr::lead(as.character(service_status))) |>
+    dplyr::ungroup() |>
     dplyr::filter(service_status != "Inactive") |>
     dplyr::filter(is.na(service_status_end_date) | service_status_end_date >= generateMIS::dashboard_start_date) |>
     dplyr::mutate(start_date = dplyr::if_else(service_status_start_date < generateMIS::dashboard_start_date, generateMIS::dashboard_start_date, service_status_start_date),
            end_date = dplyr::if_else(service_status_end_date > report_date | is.na(service_status_end_date), report_date + lubridate::days(1), service_status_end_date),
 
-           # for active period, make end_date day before discharge date except when start and end are same day
-           end_date = dplyr::if_else(service_status == "Active", end_date - lubridate::days(1), end_date),
+           # for an active period, make end_date the day before the next status starts (the day
+           # of separation isn't a served day), except when start and end are the same day.
+           # hold_day_version = "verB": when the next status is On Hold, the day the client goes
+           # on hold is still counted as Active, since a hold is a temporary absence, not a
+           # separation (the client is usually present for part of that day).
+           ends_day_before = service_status == "Active" &
+             !(hold_day_version == "verB" & next_service_status %in% "On Hold"),
+           end_date = dplyr::if_else(ends_day_before, end_date - lubridate::days(1), end_date),
            end_date = dplyr::if_else(end_date <= start_date, start_date, end_date)) |>
     dplyr::select(dplyr::any_of(c("participant_id", "service_enrollment_id", "service_id", "service_name", "funder_service_code", "service_status", "service_status_start_date", "start_date", "end_date", "service_worker_id"))) |>
 

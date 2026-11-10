@@ -156,7 +156,12 @@ fixture_services <- function() {
     status("P14", "E21", al_fc, "Inactive", "2025-06-17", decision = "2025-04-22", reason = "20 - Death"),
     # P15: assisted living, moved out on Jun 24 (S410)
     status("P15", "E22", al_fc, "Active",   "2025-04-22", decision = "2025-04-22"),
-    status("P15", "E22", al_fc, "Inactive", "2025-06-24", decision = "2025-04-22", reason = "60 - Client preference")
+    status("P15", "E22", al_fc, "Inactive", "2025-06-24", decision = "2025-04-22", reason = "60 - Client preference"),
+    # P16: assisted living, on hold (e.g. in hospital) May 1-10, back on May 11. The day
+    #   they go on hold (May 1) is a resident day under hold_day_version = "verB" only.
+    status("P16", "E23", al_fc, "Active",  "2025-04-01", decision = "2025-04-01"),
+    status("P16", "E23", al_fc, "On Hold", "2025-05-01", decision = "2025-04-01"),
+    status("P16", "E23", al_fc, "Active",  "2025-05-11", decision = "2025-04-01")
   )
 }
 
@@ -212,7 +217,7 @@ fixture_activities <- function() {
 
 fixture_participants <- function() {
   tibble::tibble(
-    participant_id = c(paste0("P", 1:15), paste0("R", 1:6)),
+    participant_id = c(paste0("P", 1:16), paste0("R", 1:6)),
     participant_date_of_birth = as.Date("1980-01-01")
   ) |>
     dplyr::mutate(participant_ohrs_special_needs = dplyr::if_else(participant_id == "P11", "Physical Disability", NA_character_),
