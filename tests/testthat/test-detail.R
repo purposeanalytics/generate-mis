@@ -172,3 +172,18 @@ test_that("census runs stop at month ends and between gaps", {
   expect_equal(runs$end_date, as.Date(c("2025-04-30", "2025-05-02", "2025-05-05")))
   expect_equal(runs$value, c(2L, 2L, 1L))
 })
+
+test_that("detail files are written only when asked for", {
+  default <- run_mis()
+  expect_false(any(file.exists(file.path(attr(default, "data_folder"), "processed",
+                                         c("mis_detail_by_fc.csv", "mis_detail_by_service.csv")))))
+
+  out <- run_mis(detail = TRUE)
+  for (name in c("mis_detail_by_fc", "mis_detail_by_service")) {
+    path <- file.path(attr(out, "data_folder"), "processed", paste0(name, ".csv"))
+    expect_true(file.exists(path))
+    written <- readr::read_csv(path, col_types = readr::cols(.default = "c"))
+    expect_equal(nrow(written), nrow(out[[name]]))
+    expect_equal(names(written), names(out[[name]]))
+  }
+})

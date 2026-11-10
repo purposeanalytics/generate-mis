@@ -4,7 +4,8 @@
 # two services each, including residential, CSS residential, meals, transportation, adult
 # day, I&R, unregistered contacts, group sessions and assessments. Runs generate_tables()
 # for all 24 combinations of fc_450_version, fc_455_version, fc_506_version and ir_version,
-# then saves the four output tables from each run, or compares them with a saved copy.
+# then saves the four output tables and the two detail tables from each run, or compares
+# them with a saved copy.
 #
 # Run from the repo root (takes a few minutes):
 #   Rscript dev/compare-outputs.R save      # before the change: save a baseline

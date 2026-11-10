@@ -30,7 +30,8 @@ generate_tables(
   fc_455_version = "verA", 
   fc_506_version = "verA",
   ir_version = "verCMHA",
-  report_date = Sys.Date()
+  report_date = Sys.Date(),
+  detail = FALSE
 )
 
 ```
@@ -74,6 +75,10 @@ This can take one of two conditions which assigns either CMHA or CSS statistical
 **report_date**
 
 The date the run is "as at". It defaults to today. Records dated after it are ignored: service statuses that start later and activities on later dates are dropped, and decision or first-service dates that fall later are treated as not yet known. Statuses that are still open are treated as running to the day after this date.
+
+**detail**
+
+`TRUE` also writes the detail tables, `mis_detail_by_fc.csv` and `mis_detail_by_service.csv`, to `data/processed` (see [Detail tables](#detail-tables)). They name the clients behind each statistic, so they are off by default.
 
 ## Input files
 
@@ -124,6 +129,33 @@ Language and special needs are recorded once per participant and read from parti
 |---|---|---|
 | `funder_service_code` | required | all |
 | `service_name`, `service_department_name` | expected | service list for the Power BI report |
+
+## Detail tables
+
+The detail tables list the rows behind every statistic, so a count can be traced back to the clients, enrollments and visits it came from. There is one table per reporting level, like the summary tables: `mis_detail_by_fc.csv` and `mis_detail_by_service.csv`. The visit and service summary tables are the sums of their detail rows, and the census detail expands back into the census tables, so the two always agree (the tests check this).
+
+They contain client identifiers. Write them only when needed (`detail = TRUE`), and restrict who can see them in the Power BI report.
+
+| Column | Meaning |
+|---|---|
+| `date` | The date the row counts on, as in the summary tables (for census rows, the first day of the run) |
+| `end_date` | Census rows only: the last day of the run |
+| `funder_service_code`, `service_name` | Where it is reported (`service_name` in the by-service table only) |
+| `funder_statistical_account_code`, `statistic`, `aggregation` | The account, its first three digits, and how it rolls up (as in `service_list.csv`) |
+| `participant_id` | The client. Blank for group sessions (S266, S492); "Unregistered" for not uniquely identified contacts |
+| `service_enrollment_id` | The enrollment that triggered the count: the one that started the episode (S401, S407, S489, S501, S506) or the one discharged last (S410, S411, S511, S513). Blank for census rows |
+| `all_enrollment_ids` | All enrollments, when overlapping enrollments in the same FC were merged into one episode |
+| `activity_id`, `activity_group_id` | The activity or group session behind a visit-based count |
+| `value` | What the row adds: 1 for a count, or days, hours, meals or interactions. Census rows: the number of days in the run |
+| `source_date`, `source_note` | Why the row counts: the episode or wait start date; the activity type, meal type, assessment outcome or discharge reason |
+
+What a row is depends on the statistic:
+
+- **Episodes** (S401, S410, S411, S489, S506, S513) and **waits** (S407): one row each.
+- **Visits and activities** (S248, S265, S450/S451, S454, S483/S484, S491, S512): one row per activity counted. Where only one visit counts per client per day, the row is the activity kept. A group participant's S454 row carries their share of the session's hours.
+- **Group sessions** (S266, S492): one row per session, with no client.
+- **Admissions and file closures** (S501, S511): one row each, in AC 82 9 90.
+- **Census statistics** (S403, S406, S455, S855, S950, S955): one row per run of consecutive days for a client, ending at the end of each month. To total them, follow `aggregation`: add up `value` for S403 (`sum_census`); count the rows that cover the last day of the period for S406 (`end_of_period`); count distinct clients for S455, S855, S950 and S955 (`distinct_cumulative`).
 
 ## Tests
 
