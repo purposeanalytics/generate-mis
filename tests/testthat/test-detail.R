@@ -186,6 +186,9 @@ test_that("reference note: the earlier event behind the row, with its date", {
   expect_equal(label(assessment), "Referred")
   expect_equal(assessment$value, days(assessment))
 
+  # same-day waits add no days and have no rows
+  expect_true(all(detail$value[stat == "407"] > 0))
+
   # wait for service: dated at service start; hold days aren't counted, so the value can be less
   wait <- detail[stat == "407" & detail$funder_statistical_account_code != "407 99 10", ]
   expect_gt(nrow(wait), 0)

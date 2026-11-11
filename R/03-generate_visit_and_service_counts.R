@@ -180,6 +180,8 @@ generate_visit_and_service_counts <- function(processed_data,
     calc_407 |>
       earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = grain, report_on = service_start_date) |>
       dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
+      # a same-day wait adds no days, so it has no detail row
+      dplyr::filter(days_waited > 0) |>
       add_statistical_account(statistic = "407",
                               sr_category = default_sr_category(funder_service_code),
                               detail = "20") |>
@@ -213,6 +215,8 @@ generate_visit_and_service_counts <- function(processed_data,
     calc_407_99 |>
       earliest_overlaps(service_status_start_date, service_status_end_date, report_date, merge_level = grain) |>
       dplyr::mutate(days_waited = lubridate::interval(merged_start_date, merged_end_date)/lubridate::days(1)) |>
+      # a same-day wait adds no days, so it has no detail row
+      dplyr::filter(days_waited > 0) |>
       add_statistical_account(statistic = "407",
                               sr_category = "99",
                               detail = "10") |>
