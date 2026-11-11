@@ -413,9 +413,10 @@ detail_by_grain <- function(df, grain, value = 1L, reference = NA_character_, no
                   dplyr::any_of("participant_id"), reference_id, reference_note, value)
 }
 
-# Note for reference_note, e.g. "Wait started 2025-04-01" (NA when there is no date)
-started_note <- function(what, date) {
-  dplyr::if_else(is.na(date), NA_character_, paste(what, "started", format(date, "%Y-%m-%d")))
+# Note for reference_note: the event and its date, e.g. "Accepted 2025-04-01" (NA when there
+# is no date)
+dated_note <- function(event, date) {
+  dplyr::if_else(is.na(date), NA_character_, paste(event, format(date, "%Y-%m-%d")))
 }
 
 # One row per `keys`, with the IDs in column `id` as one comma-separated `reference` (in order

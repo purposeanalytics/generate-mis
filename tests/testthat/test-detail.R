@@ -172,32 +172,39 @@ test_that("census rows reference the enrollment, or the visit that made the clie
   }
 })
 
-test_that("reference note: when the wait or episode began", {
+test_that("reference note: the earlier event behind the row, with its date", {
   detail <- run_mis()$mis_detail_by_fc
   stat <- statistic_of(detail$funder_statistical_account_code)
-  note <- detail$reference_note
-  started <- function(rows) as.Date(substring(rows$reference_note, nchar(rows$reference_note) - 9))
-  days <- function(rows) as.numeric(rows$date - started(rows))
+  noted <- function(rows) as.Date(substring(rows$reference_note, nchar(rows$reference_note) - 9))
+  days <- function(rows) as.numeric(rows$date - noted(rows))
+  label <- function(rows) unique(sub(" [0-9-]{10}$", "", rows$reference_note))
 
-  # assessment wait: dated at the decision, so the value is the days since the wait started
+  # assessment wait: from referral to decision (the row's date), so the value is the days between
   assessment <- detail[detail$funder_statistical_account_code == "407 99 10", ]
   expect_gt(nrow(assessment), 0)
-  expect_true(all(startsWith(assessment$reference_note, "Wait started ")))
+  expect_equal(label(assessment), "Referred")
   expect_equal(assessment$value, days(assessment))
 
   # wait for service: dated at service start; hold days aren't counted, so the value can be less
   wait <- detail[stat == "407" & detail$funder_statistical_account_code != "407 99 10", ]
   expect_gt(nrow(wait), 0)
-  expect_true(all(startsWith(wait$reference_note, "Wait started ")))
+  expect_equal(label(wait), "Wait started")
   expect_true(all(wait$value <= days(wait)))
 
-  # episodes: every row notes an episode start on or before its date
-  episodes <- detail[stat %in% c("401", "410", "411", "489", "501", "506", "511", "513"), ]
-  expect_true(all(startsWith(episodes$reference_note, "Episode started ")))
-  expect_true(all(started(episodes) <= episodes$date))
+  # admissions and first service note the acceptance; discharges the admission; file closed
+  # the acceptance (the S501 date)
+  for (s in c("401", "506", "511")) expect_equal(label(detail[stat == s, ]), "Accepted", info = s)
+  expect_equal(label(detail[stat %in% c("410", "411", "513"), ]), "Admitted")
+  episodes <- detail[stat %in% c("401", "410", "411", "506", "511", "513"), ]
+  expect_true(all(noted(episodes) <= episodes$date))
 
-  # everything else has no note
-  expect_true(all(is.na(note[!stat %in% c("401", "407", "410", "411", "489", "501", "506", "511", "513")])))
+  # R3 is accepted Apr 21 (on the waitlist), admitted May 19 (service starts) and discharged
+  # Jun 23 (S513): the discharge notes the admission, not the acceptance
+  r3 <- detail[detail$participant_id %in% "R3" & stat == "513", ]
+  expect_equal(r3$reference_note, "Admitted 2025-05-19")
+
+  # referrals and organization admissions are dated at the acceptance, so no note
+  expect_true(all(is.na(detail$reference_note[!stat %in% c("401", "407", "410", "411", "506", "511", "513")])))
 })
 
 test_that("detail files are written", {
