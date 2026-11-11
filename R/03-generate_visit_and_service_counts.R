@@ -273,6 +273,8 @@ generate_visit_and_service_counts <- function(processed_data,
                                                            .default = "513"),
                               sr_category = default_sr_category(funder_service_code),
                               detail = dplyr::if_else(funder_service_code %in% css_residential_fcs, participant_funder_age_group_code, service_status_reason_code)) |>
+      # a reason that isn't an account for the FC becomes 90 (warned once, at the FC level)
+      fix_unknown_reasons("513", warn = grain == "fc") |>
       dplyr::rename(date = merged_end_date) |>
       detail_by_grain(grain, reference = enrollment_ids, note = dated_note("Admitted", first_active_date))
   }
@@ -747,6 +749,8 @@ generate_visit_and_service_counts <- function(processed_data,
                             # CSS reports the discharge reason; CMH&A reports 90 (OHRS Ch. 7: S511 ** 90)
                             detail = dplyr::case_when(sr_code == "80" & stringr::str_detect(service_status_reason_code, "^\\d\\d$") ~ service_status_reason_code,
                                                       .default = "90")) |>
+    # a reason that isn't an account in 82 9 90 becomes 90
+    fix_unknown_reasons("511") |>
     dplyr::rename(date = merged_end_date) |>
     detail_by_grain("fc", reference = enrollment_ids, note = dated_note("Accepted", merged_start_date))
 

@@ -41,3 +41,19 @@ test_that("the fixtures produce only accounts in the OHRS code table", {
   out <- run_mis()
   expect_false(any(grepl("aren't in the OHRS code table", attr(out, "warnings"), fixed = TRUE)))
 })
+
+test_that("a discharge reason that isn't an account for the FC is reported as 90, with a warning", {
+  # 13 isn't an OHRS discharge reason; 10 (goals met) is
+  rows <- tibble::tibble(funder_service_code = c("72 5 82 33", "72 5 82 33", "82 9 90", "83 9 90"),
+                         funder_statistical_account_code = c("513 80 10", "513 80 13", "511 80 13", "511 80 10"))
+
+  expect_warning(out <- fix_unknown_reasons(rows, "513"), "513 80 13 in 72 5 82 33", class = "generateMIS_data_warning")
+  expect_equal(out$funder_statistical_account_code, c("513 80 10", "513 80 90", "511 80 13", "511 80 10"))
+
+  # S511 in the organizational AC; 83 9 90 is checked as 82 9 90
+  expect_warning(out <- fix_unknown_reasons(rows, "511"), "511 80 13 in 82 9 90 (1)", fixed = TRUE, class = "generateMIS_data_warning")
+  expect_equal(out$funder_statistical_account_code[3:4], c("511 80 90", "511 80 10"))
+
+  # nothing to fix, no warning
+  expect_no_warning(fix_unknown_reasons(rows[1, ], "513"))
+})

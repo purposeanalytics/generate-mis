@@ -610,6 +610,27 @@ drop_same_day_corrections <- function(services) {
 
 # A warning about the input data, with its own class (generateMIS_data_warning) so callers
 # can pick these out from other warnings.
+# A CSS discharge reason (the last two digits of S513 80 ** or S511 80 **) that the code table
+# doesn't list for the FC is reported as reason 90, with a data warning naming the codes, so
+# no account is reported that OHRS doesn't have. 83 9 90 is checked as 82 9 90, as in
+# check_accounts().
+fix_unknown_reasons <- function(df, statistic, warn = TRUE) {
+  valid <- with(generateMIS::all_functional_centres_and_statistical_codes,
+                paste(funder_service_code, funder_statistical_account_code))
+  check_fc <- dplyr::if_else(df$funder_service_code == "83 9 90", "82 9 90", df$funder_service_code)
+  unknown <- startsWith(df$funder_statistical_account_code, paste(statistic, "80 ")) &
+    !paste(check_fc, df$funder_statistical_account_code) %in% valid
+
+  if (warn && any(unknown)) {
+    found <- table(paste0(df$funder_statistical_account_code[unknown], " in ", df$funder_service_code[unknown]))
+    data_warning(glue::glue("{sum(unknown)} discharge(s) had a reason code that isn't an OHRS account for the FC ",
+                            "({paste0(names(found), ' (', found, ')', collapse = '; ')}); reported as ",
+                            "{statistic} 80 90. Check the discharge reasons in the source data."))
+  }
+  df$funder_statistical_account_code[unknown] <- paste(statistic, "80 90")
+  df
+}
+
 data_warning <- function(message) {
   warning(structure(class = c("generateMIS_data_warning", "warning", "condition"),
                     list(message = message, call = NULL)))
