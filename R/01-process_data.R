@@ -147,8 +147,13 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
            # hold_day_version = "verB": when the next status is On Hold, the day the client goes
            # on hold is still counted as Active, since a hold is a temporary absence, not a
            # separation (the client is usually present for part of that day).
-           ends_day_before = service_status == "Active" &
-             !(hold_day_version == "verB" & next_service_status %in% "On Hold"),
+           # A wait (On Waitlist, Waiting for Assessment) that has ended also stops the day
+           # before the next status starts: the client is no longer waiting on the day of their
+           # first service, decision, hold or withdrawal (OHRS Ch. 7 and Ch. 10, S406 ** 20).
+           wait_ended = service_status %in% c("On Waitlist", "Waiting for Assessment") &
+             !is.na(service_status_end_date) & service_status_end_date <= report_date,
+           ends_day_before = (service_status == "Active" &
+             !(hold_day_version == "verB" & next_service_status %in% "On Hold")) | wait_ended,
            end_date = dplyr::if_else(ends_day_before, end_date - lubridate::days(1), end_date),
            end_date = dplyr::if_else(end_date <= start_date, start_date, end_date)) |>
     dplyr::select(dplyr::any_of(c("participant_id", "service_enrollment_id", "service_id", "service_name", "funder_service_code", "service_status", "service_status_start_date", "start_date", "end_date", "service_worker_id"))) |>

@@ -68,6 +68,18 @@ generate_census_counts <- function(processed_data,
 
   rlog::log_info("Generating S406 statistic")
 
+  # One row per client, unit and day on a wait, referencing the enrollment(s), with a note on
+  # when the wait began (the earliest, if several enrollments in the unit are waiting)
+  waiting_days <- function(waiting, grain, label) {
+    keys <- c("date", "participant_id", grain_cols(grain), "service_status")
+    started <- waiting |>
+      dplyr::summarize(wait_start = min(service_status_start_date), .by = dplyr::all_of(keys))
+    waiting |>
+      collapse_ids(keys, "service_enrollment_id") |>
+      dplyr::left_join(started, by = keys) |>
+      dplyr::mutate(note = dated_note(label, wait_start))
+  }
+
   calc_406 <- function(grain) {
     mis_daily_census |>
       filter_eligible("406") |>
@@ -75,11 +87,11 @@ generate_census_counts <- function(processed_data,
       dplyr::filter(service_status == "On Waitlist") |>
       # exclude first day of wait where duration is zero -- only count on waitlist if they wait one day or more
       dplyr::filter(service_status_start_date != date) |>
-      collapse_ids(c("date", "participant_id", grain_cols(grain), "service_status"), "service_enrollment_id") |>
+      waiting_days(grain, "Wait started") |>
       add_statistical_account(statistic = "406",
                               sr_category = default_sr_category(funder_service_code),
                               detail = "20") |>
-      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id, reference)
+      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id, reference, note)
   }
 
 
@@ -99,11 +111,11 @@ generate_census_counts <- function(processed_data,
       dplyr::filter(service_status == "Waiting for Assessment") |>
       # exclude first day of wait where duration is zero -- only count as waiting for assessment if they wait one day or more
       dplyr::filter(service_status_start_date != date) |>
-      collapse_ids(c("date", "participant_id", grain_cols(grain), "service_status"), "service_enrollment_id") |>
+      waiting_days(grain, "Referred") |>
       add_statistical_account(statistic = "406",
                               sr_category = "99",
                               detail = "10") |>
-      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id, reference)
+      dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code, participant_id, reference, note)
   }
 
 
@@ -298,12 +310,19 @@ generate_census_counts <- function(processed_data,
   # One row per client, unit, account and day, with value 1, in the detail table layout.
   # generate_tables() adds them to the visit and service detail and writes the files.
   census_rows <- function(daily, grain) {
+    keys <- c("date", grain_cols(grain), "funder_statistical_account_code", "participant_id")
+    # notes (S406 wait starts): the earliest, if rows for one client and day were combined
+    notes <- daily |>
+      dplyr::filter(!is.na(note)) |>
+      dplyr::summarize(note = min(note), .by = dplyr::all_of(keys))
     daily |>
-      collapse_ids(c("date", grain_cols(grain), "funder_statistical_account_code", "participant_id"), "reference") |>
-      detail_by_grain(grain, reference = reference) |>
+      collapse_ids(keys, "reference") |>
+      dplyr::left_join(notes, by = keys) |>
+      detail_by_grain(grain, reference = reference, note = note) |>
       add_aggregation() |>
       add_funder_key(grain)
   }
+
 
   census_by_fc <- census_rows(daily_fc, "fc")
   check_accounts(census_by_fc, "mis_detail_by_fc (census statistics)")

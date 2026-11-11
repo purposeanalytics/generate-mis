@@ -41,7 +41,8 @@ test_that("census rows in the detail are one row per client per day, with value 
       expect_false(anyNA(census$participant_id))
       expect_true(all(census$value == 1))
       expect_false(anyNA(census$reference_id))
-      expect_true(all(is.na(census$reference_note)))
+      # only the waits (S406) have a note
+      expect_true(all(is.na(census$reference_note[statistic_of(census$funder_statistical_account_code) != "406"])))
       expect_equal(nrow(dplyr::distinct(census)), nrow(census))
     }
   }
@@ -204,7 +205,28 @@ test_that("reference note: the earlier event behind the row, with its date", {
   expect_equal(r3$reference_note, "Admitted 2025-05-19")
 
   # referrals and organization admissions are dated at the acceptance, so no note
-  expect_true(all(is.na(detail$reference_note[!stat %in% c("401", "407", "410", "411", "506", "511", "513")])))
+  expect_true(all(is.na(detail$reference_note[!stat %in% c("401", "406", "407", "410", "411", "506", "511", "513")])))
+})
+
+test_that("waiting rows (S406) note when the wait began", {
+  detail <- run_mis()$mis_detail_by_fc
+  stat <- statistic_of(detail$funder_statistical_account_code)
+  label <- function(rows) unique(sub(" [0-9-]{10}$", "", rows$reference_note))
+
+  expect_equal(label(detail[detail$funder_statistical_account_code != "406 99 10" & stat == "406", ]), "Wait started")
+  expect_equal(label(detail[detail$funder_statistical_account_code == "406 99 10", ]), "Referred")
+
+  # R3 waits from Apr 21 (counted from the next day) until service starts May 19, then waits
+  # again from Jun 23: each day notes the wait it belongs to
+  r3 <- detail[detail$participant_id %in% "R3" & stat == "406", ]
+  expect_equal(r3$reference_note[r3$date == as.Date("2025-04-22")], "Wait started 2025-04-21")
+  expect_equal(r3$reference_note[r3$date == as.Date("2025-05-18")], "Wait started 2025-04-21")
+  expect_equal(r3$reference_note[r3$date == as.Date("2025-06-24")], "Wait started 2025-06-23")
+
+  # no longer waiting on the day service starts (OHRS Ch. 10, S406 ** 20): the first wait's
+  # last day is May 18, the second's Jul 20
+  expect_equal(max(r3$date[r3$date < as.Date("2025-06-23")]), as.Date("2025-05-18"))
+  expect_equal(max(r3$date), as.Date("2025-07-20"))
 })
 
 test_that("detail files are written", {
