@@ -166,10 +166,15 @@ test_that("census rows reference the enrollment, or the visit that made the clie
     stat <- statistic_of(detail$funder_statistical_account_code)
     # S403 and S406: the enrollment the client was on
     expect_true(all(ids(detail$reference_id[stat %in% c("403", "406")]) %in% enrollment_ids))
-    # served statistics: the visits (verA, verB), or the active enrollment (verC)
-    served <- ids(detail$reference_id[stat %in% c("455", "855", "950", "955")])
+    # served statistics: the visits (verA, verB), or the active enrollment (verC). Resident
+    # days with no visit reference the enrollment under every version.
+    is_served <- stat %in% c("455", "855", "950", "955")
+    served <- ids(detail$reference_id[is_served])
     expect_gt(length(served), 0)
-    expect_true(all(served %in% if (version == "verC") enrollment_ids else activity_ids), info = version)
+    expect_true(all(served %in% c(activity_ids, enrollment_ids)), info = version)
+    outside_residential <- is_served & !detail$funder_service_code %in% c(al_fc, "82 9 90", "83 9 90")
+    expect_true(all(ids(detail$reference_id[outside_residential]) %in% if (version == "verC") enrollment_ids else activity_ids),
+                info = version)
   }
 })
 

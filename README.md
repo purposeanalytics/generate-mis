@@ -58,6 +58,8 @@ This can take one of three conditions for counting individuals under the "Indivi
 * `verB` which requires that an individual has received at least one visit *regardless* of their enrollment or admission status 
 * `verC` which requires that an individual has been enrolled or admitted to a program or service *regardless* of whether they have received a visit (useful for programs where visits/contacts are not recorded against the client file)
 
+Under every version, residential functional centres (those that report S403 resident days) count each resident day as service, whether or not a visit was recorded, so anyone with resident days is an individual served in that functional centre (OHRS Ch. 10, Assisted Living and Day Services; Ch. 7, intake example).
+
 **fc_506_version**
 
 This can take one of two conditions for counting when the first service was received (506 \*\* \*\*):

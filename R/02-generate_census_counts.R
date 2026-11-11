@@ -128,8 +128,9 @@ generate_census_counts <- function(processed_data,
   # source is used; `cols` are the columns to keep besides date and participant_id.
   # Under verB, language and special needs come from the visit records; otherwise from the
   # participant record (via the daily census).
+  # In residential FCs, every Active (resident) day also counts, under every version (below).
   # reference: the visit(s) that made the client count that day (verA, verB), or the
-  # enrollment(s) they were active on (verC).
+  # enrollment(s) they were active on (verC, and resident days with no visit).
   served_days <- function(cols, keep = identity, match_on = character(0)) {
     id_cols <- c("date", "participant_id", cols)
 
@@ -157,10 +158,25 @@ generate_census_counts <- function(processed_data,
         dplyr::inner_join(visits, by = c("date", "participant_id", match_on))
     }
 
-    switch(fc_455_version,
-           verA = active_days_with_visit(),
-           verB = visit_days(),
-           verC = active_days())
+    # Residential FCs (those that report S403): a resident day is service, whether or not a
+    # visit was recorded, under every version (OHRS Ch. 10, Assisted Living and Day Services:
+    # S403 is the activity S455 is counted on; Ch. 7, intake example step 8: S455 when service
+    # starts). So anyone with resident days is served in that FC.
+    resident_days <- function() {
+      mis_daily_census |>
+        dplyr::filter(service_status == "Active") |>
+        filter_eligible("403") |>
+        keep() |>
+        collapse_ids(id_cols, "service_enrollment_id")
+    }
+
+    served <- switch(fc_455_version,
+                     verA = active_days_with_visit(),
+                     verB = visit_days(),
+                     verC = active_days())
+
+    # add resident days not already served; where there was a visit, it stays the reference
+    dplyr::bind_rows(served, dplyr::anti_join(resident_days(), served, by = id_cols))
   }
 
 
