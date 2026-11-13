@@ -89,6 +89,9 @@ process_data <- function(data_folder, debug = FALSE, report_date = lubridate::to
     # drop Active statuses corrected the same day (uses the recorded end dates)
     drop_same_day_corrections() |>
 
+    # a hold after a discharge doesn't reopen the file (see number_episodes())
+    drop_holds_after_discharge() |>
+
     # reset service_start_end_date
     dplyr::group_by(service_enrollment_id) |>
     dplyr::arrange(service_enrollment_id, service_status_start_date, service_status) |>

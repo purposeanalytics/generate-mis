@@ -1,4 +1,4 @@
-# Episode rules (see number_episodes()), using clients R1-R6 in the ACT team FC (act_fc).
+# Episode rules (see number_episodes()), using clients R1-R8 in the ACT team FC (act_fc).
 # All are CMH&A adults, so accounts are 489 25 40, 506 25 40, 407 25 20, 513 25 90, 406 25 20.
 
 test_that("service that pauses and resumes is one episode: one referral, one first service", {
@@ -39,14 +39,27 @@ test_that("a return to the waitlist after service started is a discharge and a n
   expect_equal(value_on(fc, act_fc, "489 25 40", "2025-06-23"), 1)
   expect_equal(value_on(fc, act_fc, "506 25 40", "2025-07-21"), 1)
   expect_equal(value_on(fc, act_fc, "407 25 20", "2025-07-21"), 28)
-  expect_equal(value_total(fc, act_fc, "489 25 40"), 7)  # R1, R2 twice, R3 twice, R5, R6 (not R4)
-  expect_equal(value_total(fc, act_fc, "513 25 90"), 2)  # R2, R3
+  expect_equal(value_total(fc, act_fc, "489 25 40"), 10)  # R1, R2 twice, R3 twice, R5, R6, R7, R8 twice (not R4)
+  expect_equal(value_total(fc, act_fc, "513 25 90"), 4)   # R2, R3, R7, R8
   # still the organization's client: no file closed or new admission
   expect_equal(value_on(fc, "82 9 90", "511 25 90", "2025-06-23"), 0)
   expect_equal(value_on(fc, "82 9 90", "501 25 40", "2025-06-23"), 0)
   # counted as waiting again: R3 on Jun 30; R2 and R3 on Jul 10
   expect_equal(value_on(census, act_fc, "406 25 20", "2025-06-30"), 1)
   expect_equal(value_on(census, act_fc, "406 25 20", "2025-07-10"), 2)
+})
+
+test_that("a hold after a discharge doesn't reopen the file; Waitlist or Active does", {
+  fc <- run_mis()$mis_visit_and_service_counts_by_fc
+  # R7: Active Apr 10, Inactive May 5, On Hold May 30 (still open): one referral, discharged May 5
+  expect_equal(value_on(fc, act_fc, "489 25 40", "2025-04-10"), 1)
+  expect_equal(value_on(fc, act_fc, "489 25 40", "2025-05-30"), 0)
+  expect_equal(value_on(fc, act_fc, "513 25 90", "2025-05-05"), 1)
+  # R8: Active Apr 15, Inactive May 6, On Hold May 27, Active Jun 24: referred again on Jun 24
+  expect_equal(value_on(fc, act_fc, "489 25 40", "2025-05-27"), 0)
+  expect_equal(value_on(fc, act_fc, "489 25 40", "2025-06-24"), 1)
+  expect_equal(value_on(fc, act_fc, "513 25 90", "2025-05-06"), 1)
+  expect_equal(value_on(fc, act_fc, "506 25 40", "2025-06-24"), 1)
 })
 
 test_that("a referral (S489) needs an eligibility decision date, and a missing one is warned about", {

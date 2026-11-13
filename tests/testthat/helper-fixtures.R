@@ -6,7 +6,7 @@ mh_fc   <- "72 5 09 76"  # Case Management - Mental Health (fund type 2)
 mh3_fc  <- "73 5 09 76"  # Case Management - Mental Health (fund type 3)
 ps_fc   <- "72 5 82 33"  # CSS Personal Support/Independence Training
 cm_fc   <- "72 5 82 09"  # CSS Case Management
-act_fc  <- "72 5 10 76 20"  # MH Assertive Community Treatment Teams (episode rules, R1-R6)
+act_fc  <- "72 5 10 76 20"  # MH Assertive Community Treatment Teams (episode rules, R1-R8)
 day_fc  <- "72 5 20 76 10"  # Day/Night Care - Mental Health (attendance days, S483)
 tr3_fc  <- "73 5 82 14"     # CSS Transportation - Client (fund type 3)
 al_fc   <- "72 5 82 45"     # CSS Assisted Living (residential: S410/S411 instead of S513)
@@ -114,7 +114,7 @@ fixture_services <- function() {
     #   Language and special needs are on both the participant record and the activity.
     status("P11", "E12", ps_fc, "Active", "2025-08-01", decision = "2025-08-01"),
 
-    # R1-R6: episode rules (test-episode-rules.R), in their own FC with no visits.
+    # R1-R8: episode rules (test-episode-rules.R), in their own FC with no visits.
     # R1: service paused, then resumed: one episode
     status("R1", "E13", act_fc, "Active",  "2025-04-07", decision = "2025-04-07"),
     status("R1", "E13", act_fc, "On Hold", "2025-05-05", decision = "2025-04-07"),
@@ -145,6 +145,16 @@ fixture_services <- function() {
     # R6: put on the waitlist and started the same day: the Active is kept
     status("R6", "E18", act_fc, "On Waitlist", "2025-04-08", decision = "2025-04-08", end = "2025-04-08"),
     status("R6", "E18", act_fc, "Active",      "2025-04-08", decision = "2025-04-08"),
+    # R7: put on hold after being discharged: the hold doesn't reopen the file, so one
+    #   referral and one discharge
+    status("R7", "E24", act_fc, "Active",   "2025-04-10", decision = "2025-04-10"),
+    status("R7", "E24", act_fc, "Inactive", "2025-05-05", decision = "2025-04-10", reason = "10 - Goals met"),
+    status("R7", "E24", act_fc, "On Hold",  "2025-05-30", decision = "2025-04-10"),
+    # R8: on hold after being discharged, then Active again: the file reopens on the Active
+    status("R8", "E25", act_fc, "Active",   "2025-04-15", decision = "2025-04-15"),
+    status("R8", "E25", act_fc, "Inactive", "2025-05-06", decision = "2025-04-15", reason = "10 - Goals met"),
+    status("R8", "E25", act_fc, "On Hold",  "2025-05-27", decision = "2025-04-15"),
+    status("R8", "E25", act_fc, "Active",   "2025-06-24", decision = "2025-04-15"),
 
     # P12: MH day program (see fixture_activities())
     status("P12", "E19", day_fc, "Active", "2025-04-15", decision = "2025-04-15"),

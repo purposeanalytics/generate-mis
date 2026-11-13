@@ -529,6 +529,9 @@ first_date <- function(dates) {
 # Rules (decided with the user, 2026-11-04):
 # - An Inactive status ends an episode. Any later status in the same enrollment starts a new
 #   one (the file was reopened), with its own referral, first service, wait and discharge.
+# - A Hold straight after an Inactive doesn't reopen the file: a discharged service can't be
+#   paused. These holds are dropped before episodes are numbered, so the client stays
+#   discharged until the file reopens on Waitlist or Active: see drop_holds_after_discharge().
 # - Once service has started in an episode, a return to On Waitlist also ends it: the client
 #   is discharged from the service (S513) and the waitlist starts a new episode with a new
 #   referral (S489), wait and first service (OHRS Ch. 10, 10.9.4.4 example 2). The client
@@ -606,6 +609,35 @@ drop_same_day_corrections <- function(services) {
     dplyr::distinct(service_enrollment_id, service_status, service_status_start_date)
 
   dplyr::anti_join(services, corrected, by = c("service_enrollment_id", "service_status", "service_status_start_date"))
+}
+
+# Drop On Hold statuses that come straight after an Inactive in the same enrollment (or after
+# another such hold): a discharged service can't be paused, so the client stays discharged
+# until the file reopens on Waitlist or Active (see number_episodes()). Logs how many were
+# dropped. Run it before end dates are recalculated, so the Inactive runs until the next
+# status that is kept.
+drop_holds_after_discharge <- function(services) {
+  services <- services |>
+    dplyr::arrange(service_enrollment_id, service_status_start_date, service_status)
+
+  status <- as.character(services$service_status)
+  is_hold <- status == "On Hold"
+  # position of the latest status that isn't a hold, up to each row, within the enrollment
+  first_row <- !duplicated(services$service_enrollment_id)
+  latest_non_hold <- stats::ave(ifelse(is_hold, 0L, seq_along(status)),
+                                cumsum(first_row), FUN = cummax)
+  after_discharge <- is_hold & latest_non_hold > 0 &
+    status[pmax(latest_non_hold, 1L)] == "Inactive"
+
+  if (any(after_discharge)) {
+    rlog::log_info(glue::glue("Dropped {sum(after_discharge)} On Hold status(es) that came straight ",
+                              "after a discharge (Inactive) in ",
+                              "{dplyr::n_distinct(services$service_enrollment_id[after_discharge])} ",
+                              "enrollment(s); those clients stay discharged until the file reopens ",
+                              "on Waitlist or Active"))
+  }
+
+  services[!after_discharge, ]
 }
 
 # A warning about the input data, with its own class (generateMIS_data_warning) so callers
