@@ -34,7 +34,7 @@ test_that("visit and service detail adds up to the summary rows, by FC and by se
 
 test_that("census rows in the detail are one row per client per day, with value 1", {
   for (version in c("verA", "verB", "verC")) {
-    out <- run_mis(fc_455_version = version)
+    out <- run_mis(fc_455_version = version, fc_506_version = matching_506(version))
     for (detail in list(out$mis_detail_by_fc, out$mis_detail_by_service)) {
       census <- detail[detail$aggregation != "sum_visits_and_services", ]
       expect_gt(nrow(census), 0)
@@ -162,7 +162,7 @@ test_that("census rows reference the enrollment, or the visit that made the clie
   enrollment_ids <- fixture_services()$service_enrollment_id
 
   for (version in c("verA", "verB", "verC")) {
-    detail <- run_mis(fc_455_version = version)$mis_detail_by_fc
+    detail <- run_mis(fc_455_version = version, fc_506_version = matching_506(version))$mis_detail_by_fc
     stat <- statistic_of(detail$funder_statistical_account_code)
     # S403 and S406: the enrollment the client was on
     expect_true(all(ids(detail$reference_id[stat %in% c("403", "406")]) %in% enrollment_ids))

@@ -16,7 +16,7 @@ test_that("transportation trips have no 5-minute rule in either fund type", {
 
 test_that("an activity recorded as an assessment outside CSS case management is not evidence of service", {
   # P12: "Assessment" on Jun 10 in a CMH&A FC; served on Jun 3 (verB, any length) only
-  census <- run_mis(fc_450_version = "verB", fc_455_version = "verB")$mis_detail_by_fc
+  census <- run_mis(fc_450_version = "verB", fc_455_version = "verB", fc_506_version = "verB")$mis_detail_by_fc
   p12 <- census[census$participant_id %in% "P12" & substr(census$funder_statistical_account_code, 1, 3) == "455", ]
   expect_equal(sort(unique(p12$date)), as.Date("2025-06-03"))
 })

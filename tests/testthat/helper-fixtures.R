@@ -292,3 +292,6 @@ people <- function(tbl, fc, account) {
   rows <- tbl[tbl$funder_service_code == fc & tbl$funder_statistical_account_code == account, ]
   sort(unique(rows$participant_id))
 }
+
+# fc_506_version to run with a given fc_455_version: verB is required with verB
+matching_506 <- function(fc_455_version) if (fc_455_version == "verB") "verB" else "verA"

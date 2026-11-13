@@ -10,7 +10,7 @@ test_that("verA: served needs both an Active enrolment and a visit", {
 })
 
 test_that("verB: served is based on visits alone", {
-  out <- run_mis(fc_455_version = "verB")
+  out <- run_mis(fc_455_version = "verB", fc_506_version = "verB")
   census <- out$mis_detail_by_fc
   expect_true("P3" %in% people(census, mh_fc, "455 25 40"))
   expect_true("P3" %in% people(census, "82 9 90", "855 25 54"))
@@ -26,4 +26,10 @@ test_that("verC: served is based on Active enrolment alone", {
   expect_false("P3" %in% people(census, "82 9 90", "855 25 54"))
   expect_true("P7" %in% people(census, ps_fc, "455 80 40"))
   expect_true("P7" %in% people(census, "82 9 90", "855 80 54"))
+})
+
+test_that("verB requires fc_506_version = \"verB\"; verA accepts either", {
+  expect_error(run_mis(fc_455_version = "verB", fc_506_version = "verA"),
+               "requires fc_506_version = \"verB\"")
+  expect_no_error(run_mis(fc_455_version = "verA", fc_506_version = "verB"))
 })

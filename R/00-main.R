@@ -4,6 +4,18 @@
 #' @param report_date The date the run is "as at". Open statuses run to the day after this
 #'   date and only discharges on or before it are counted. Defaults to today; pass an
 #'   earlier date to reproduce a past run.
+#' @param fc_455_version What counts as being served (S455, S855, S950, S955):
+#'   - `"verA"` (default): an Active enrollment and a visit that day
+#'   - `"verB"`: a visit, whatever the enrollment status
+#'   - `"verC"`: an Active enrollment, with or without a visit
+#'   In residential FCs every Active (resident) day counts as served, under every version.
+#' @param fc_506_version How first service (S506) is dated:
+#'   - `"verA"` (default): the day the enrollment first became Active in each episode
+#'   - `"verB"`: the first completed direct activity while Active
+#'   Everyone counted in S506 should also be counted in S455, so `fc_455_version = "verB"`
+#'   (served needs a visit) requires `fc_506_version = "verB"`; otherwise a client who is
+#'   Active with no visits would receive a first service without being served. Either
+#'   version is accepted with `fc_455_version = "verA"`.
 #' @param hold_day_version How the day a client goes on hold is counted in the daily census
 #'   (S403 resident days, and other daily statistics):
 #'   - `"verA"` (default): an Active status ends the day before the next status starts,
@@ -32,6 +44,12 @@ generate_tables <- function(data_folder = here::here("data"),
                             debug = FALSE) {
 
   report_date <- as.Date(report_date)
+
+  if (fc_455_version == "verB" && fc_506_version != "verB") {
+    stop("fc_455_version = \"verB\" (served needs a visit) requires fc_506_version = \"verB\", ",
+         "so that everyone counted in S506 (first service) is also counted in S455 (served).",
+         call. = FALSE)
+  }
 
   if(debug == TRUE) {
     rlog::log_warn("Running in debug mode")

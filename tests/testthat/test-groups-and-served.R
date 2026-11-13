@@ -34,7 +34,7 @@ test_that("residents are served in a residential FC without a recorded visit, un
   # visits recorded there. A resident day is service (OHRS Ch. 10, Assisted Living and Day
   # Services; Ch. 7, intake example step 8), so they are served whatever fc_455_version is.
   for (version in c("verA", "verB", "verC")) {
-    detail <- run_mis(fc_455_version = version)$mis_detail_by_fc
+    detail <- run_mis(fc_455_version = version, fc_506_version = matching_506(version))$mis_detail_by_fc
     stat <- substr(detail$funder_statistical_account_code, 1, 3)
     al <- detail$funder_service_code == al_fc
 
