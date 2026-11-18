@@ -25,13 +25,13 @@ pak::pak("purposeanalytics/generateMIS")
 library(generateMIS)
 
 generate_tables(
-  data_folder, 
-  fc_450_version = "verA"
-  fc_455_version = "verA", 
+  data_folder,
+  fc_450_version = "verA",
+  fc_455_version = "verA",
   fc_506_version = "verA",
   ir_version = "verCMHA",
   report_date = Sys.Date(),
-  detail = FALSE
+  hold_day_version = "verA"
 )
 
 ```
@@ -69,6 +69,8 @@ This can take one of two conditions for counting when the first service was rece
 * `verA` which counts the date of enrollment or admission as the first service date
 * `verB` which counts the first visit after the enrollment or admission date
 
+Everyone counted in S506 should also be counted as served (S455), so `fc_455_version = "verB"` (served needs a visit) requires `fc_506_version = "verB"`. With `fc_455_version = "verB"` and `fc_506_version = "verA"`, the run stops with an error.
+
 **ir_version**
 
 This can take one of two conditions which assigns either CMHA or CSS statistical codes to the Information and Referral functional centre:
@@ -79,6 +81,13 @@ This can take one of two conditions which assigns either CMHA or CSS statistical
 **report_date**
 
 The date the run is "as at". It defaults to today. Records dated after it are ignored: service statuses that start later and activities on later dates are dropped, and decision or first-service dates that fall later are treated as not yet known. Statuses that are still open are treated as running to the day after this date.
+
+**hold_day_version**
+
+This can take one of two conditions for counting the day a client goes on hold in the daily census (S403 resident days and the other daily statistics):
+
+* `verA` which ends an Active status the day before the next status starts, whatever it is, so the day a client goes on hold isn't counted as Active
+* `verB` which does the same for a discharge, but counts the day a client goes on hold as Active (a hold is a temporary absence, not a separation)
 
 ## Input files
 
