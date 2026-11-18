@@ -25,13 +25,13 @@ pak::pak("purposeanalytics/generateMIS")
 library(generateMIS)
 
 generate_tables(
-  data_folder, 
-  fc_450_version = "verA"
-  fc_455_version = "verA", 
+  data_folder,
+  fc_450_version = "verA",
+  fc_455_version = "verA",
   fc_506_version = "verA",
   ir_version = "verCMHA",
   report_date = Sys.Date(),
-  detail = FALSE
+  hold_day_version = "verA"
 )
 
 ```
@@ -58,12 +58,18 @@ This can take one of three conditions for counting individuals under the "Indivi
 * `verB` which requires that an individual has received at least one visit *regardless* of their enrollment or admission status 
 * `verC` which requires that an individual has been enrolled or admitted to a program or service *regardless* of whether they have received a visit (useful for programs where visits/contacts are not recorded against the client file)
 
+Under every version, residential functional centres (those that report S403 resident days) count each resident day as service, whether or not a visit was recorded, so anyone with resident days is an individual served in that functional centre (OHRS Ch. 10, Assisted Living and Day Services; Ch. 7, intake example).
+
+At the organization level (accounting centre 82 9 90 / 83 9 90), each CMH&A client is counted once, so a client in both residential and non-residential functional centres is reported under a single service recipient category. Residential takes priority: S501 and S511 use SR 45 if any enrollment in the organization file was residential, and S855 uses SR 45 for the whole fiscal year if the client was served in a residential functional centre that year. OHRS asks for one count per client (Ch. 7, 7.7.4 and S855 ** 5\*) but doesn't say which category wins, so this is our rule; confirm it with the OHRS help desk if in doubt.
+
 **fc_506_version**
 
 This can take one of two conditions for counting when the first service was received (506 \*\* \*\*):
 
 * `verA` which counts the date of enrollment or admission as the first service date
 * `verB` which counts the first visit after the enrollment or admission date
+
+Everyone counted in S506 should also be counted as served (S455), so `fc_455_version = "verB"` (served needs a visit) requires `fc_506_version = "verB"`. With `fc_455_version = "verB"` and `fc_506_version = "verA"`, the run stops with an error.
 
 **ir_version**
 
@@ -76,9 +82,12 @@ This can take one of two conditions which assigns either CMHA or CSS statistical
 
 The date the run is "as at". It defaults to today. Records dated after it are ignored: service statuses that start later and activities on later dates are dropped, and decision or first-service dates that fall later are treated as not yet known. Statuses that are still open are treated as running to the day after this date.
 
-**detail**
+**hold_day_version**
 
-`TRUE` also writes the detail tables, `mis_detail_by_fc.csv` and `mis_detail_by_service.csv`, to `data/processed` (see [Detail tables](#detail-tables)). They name the clients behind each statistic, so they are off by default.
+This can take one of two conditions for counting the day a client goes on hold in the daily census (S403 resident days and the other daily statistics):
+
+* `verA` which ends an Active status the day before the next status starts, whatever it is, so the day a client goes on hold isn't counted as Active
+* `verB` which does the same for a discharge, but counts the day a client goes on hold as Active (a hold is a temporary absence, not a separation)
 
 ## Input files
 
@@ -132,30 +141,23 @@ Language and special needs are recorded once per participant and read from parti
 
 ## Detail tables
 
-The detail tables list the rows behind every statistic, so a count can be traced back to the clients, enrollments and visits it came from. There is one table per reporting level, like the summary tables: `mis_detail_by_fc.csv` and `mis_detail_by_service.csv`. The visit and service summary tables are the sums of their detail rows, and the census detail expands back into the census tables, so the two always agree (the tests check this).
+The detail tables list the rows behind every statistic, so a count can be traced back to the clients and records it came from. There is one table per reporting level: `mis_detail_by_fc.csv` and `mis_detail_by_service.csv`. Filter on an account, a functional centre, a client or a date range to see who was counted. The census statistics (S403, S406, S455, S855, S950, S955) are reported only here, as one row per client per day. The visit and service statistics are also summed in `mis_visit_and_service_counts_by_fc.csv` and `mis_visit_and_service_counts_by_service.csv`, which are the sums of their detail rows (the tests check this).
 
-They contain client identifiers. Write them only when needed (`detail = TRUE`), and restrict who can see them in the Power BI report.
+They contain client identifiers, so restrict who can see them in the Power BI report.
 
 | Column | Meaning |
 |---|---|
-| `date` | The date the row counts on, as in the summary tables (for census rows, the first day of the run) |
-| `end_date` | Census rows only: the last day of the run |
+| `date` | The date the row counts on, as in the summary tables |
 | `funder_service_code`, `service_name` | Where it is reported (`service_name` in the by-service table only) |
-| `funder_statistical_account_code`, `statistic`, `aggregation` | The account, its first three digits, and how it rolls up (as in `service_list.csv`) |
+| `funder_statistical_account_code` | The account (its first three digits are the statistic) |
+| `aggregation` | How the statistic totals over a period (as in `service_list.csv`; see below) |
 | `participant_id` | The client. Blank for group sessions (S266, S492); "Unregistered" for not uniquely identified contacts |
-| `service_enrollment_id` | The enrollment that triggered the count: the one that started the episode (S401, S407, S489, S501, S506) or the one discharged last (S410, S411, S511, S513). Blank for census rows |
-| `all_enrollment_ids` | All enrollments, when overlapping enrollments in the same FC were merged into one episode |
-| `activity_id`, `activity_group_id` | The activity or group session behind a visit-based count |
-| `value` | What the row adds: 1 for a count, or days, hours, meals or interactions. Census rows: the number of days in the run |
-| `source_date`, `source_note` | Why the row counts: the episode or wait start date; the activity type, meal type, assessment outcome or discharge reason |
+| `reference_id` | The record(s) to look up, comma-separated when there are several: the enrollment for episodes, waits, admissions and discharges (all of them, e.g. `E1, E2`, when overlapping enrollments in the FC were merged into one episode); the activity for visit statistics; the group session for S266, S491, S492 and group rows of S454, so one filter shows a whole session. For census statistics: the enrollment(s) the client was on that day for S403 and S406; for S455, S855, S950 and S955, the visit(s) that made them count that day (`fc_455_version` verA and verB) or their active enrollment(s) (verC) |
+| `reference_note` | The earlier event behind the row and its date: `Wait started YYYY-MM-DD` for S407 (dated at service start; hold days aren't counted, so `value` can be less than the days between); `Referred YYYY-MM-DD` for S407 99 (dated at the decision); `Accepted YYYY-MM-DD` for admissions and first service (S401, S506) and for S511, matching the S501 date; `Admitted YYYY-MM-DD` (first service) for discharges (S410, S411, S513) and for S506 under `fc_506_version = "verB"`; on each day someone is waiting, when that wait began: `Wait started YYYY-MM-DD` for S406 ** 20 and `Referred YYYY-MM-DD` for S406 99 10. Blank for other rows, including S489 and S501, which are dated at the acceptance |
+| `value` | What the row adds: 1 for a count or a client day, or days, hours, meals or interactions |
+| `funder_key`, `funder_service_key` | The key to the funder codes table, as in the summary tables (`funder_service_key` in the by-service table only) |
 
-What a row is depends on the statistic:
-
-- **Episodes** (S401, S410, S411, S489, S506, S513) and **waits** (S407): one row each.
-- **Visits and activities** (S248, S265, S450/S451, S454, S483/S484, S491, S512): one row per activity counted. Where only one visit counts per client per day, the row is the activity kept. A group participant's S454 row carries their share of the session's hours.
-- **Group sessions** (S266, S492): one row per session, with no client.
-- **Admissions and file closures** (S501, S511): one row each, in AC 82 9 90.
-- **Census statistics** (S403, S406, S455, S855, S950, S955): one row per run of consecutive days for a client, ending at the end of each month. To total them, follow `aggregation`: add up `value` for S403 (`sum_census`); count the rows that cover the last day of the period for S406 (`end_of_period`); count distinct clients for S455, S855, S950 and S955 (`distinct_cumulative`).
+To total a statistic over a period, follow its `aggregation`: add up `value` for visit and service statistics (`sum_visits_and_services`) and S403 (`sum_census`); add up `value` on the last day of the period for S406 (`end_of_period`); count distinct `participant_id` for S455, S855, S950 and S955 (`distinct_cumulative`).
 
 ## Tests
 

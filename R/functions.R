@@ -154,6 +154,19 @@ default_sr_category <- function(funder_service_code) {
     .default = "80")
 }
 
+# Sector of an SR code: CSS (80) or CMH&A (25, 45). Organization statistics (S501, S511,
+# S855) are counted once per client per sector.
+sr_sector <- function(sr_code) {
+  dplyr::if_else(sr_code == "80", "CSS", "CMH&A")
+}
+
+# One SR code for a client's organization-level count: residential (45) takes priority, so a
+# client who was a resident is counted once, as a resident. OHRS asks for one count per client
+# (Ch. 7, S855 ** 5*; S501 ** *0) but doesn't say which SR category wins; this is our rule.
+organization_sr_code <- function(sr_code) {
+  if ("45" %in% sr_code) "45" else min_or_blank(sr_code)
+}
+
 
 #' Determine functional centres that report in each statistical code
 #'
@@ -295,7 +308,7 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
   df |>
     dplyr::mutate(end_date = dplyr::if_else(is.na({{dimension_end}}), {{report_end}} + lubridate::days(1), {{dimension_end}})) |>
     dplyr::arrange(participant_id, {{dimension_start}}) |>
-    dplyr::mutate(sr_code = default_sr_category(funder_service_code)) |>
+    dplyr::mutate(sr_code = default_sr_category(funder_service_code), sector = sr_sector(sr_code)) |>
     dplyr::group_by(participant_id, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::mutate(.break = {{breaks}},
                   .next_start = as.numeric(dplyr::lead({{dimension_start}})),
@@ -304,6 +317,9 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
                                         (dplyr::lead(.break) & .next_start >= .latest_end))[-dplyr::n()])) |>
     dplyr::group_by(participant_id, participant_funder_age_group_code, index, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::summarize(merged_start_date = dplyr::first({{dimension_start}}),
+              # one SR code per merged period: residential (45) if any enrollment in it was
+              # residential (only differs at the organization level, which merges across FCs)
+              sr_code = organization_sr_code(sr_code),
               # latest end in the merged period (the last-starting row may end earlier)
               merged_end_date = max_or_blank(end_date),
               all_starts = paste({{dimension_start}}, collapse = ", "),
@@ -314,13 +330,10 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
               # reason on the row that ended last (e.g. the final discharge in the period)
               last_service_status_reason = service_status_reason[which.max(end_date)],
               service_first_direct_activity = min_or_blank(service_first_direct_activity),
-              # enrollment that started the merged period, the one that ended it, and the full
-              # list when more than one enrollment was merged (blank otherwise). These must come
-              # before service_enrollment_id below, which replaces the column with one value.
-              first_enrollment_id = dplyr::first(service_enrollment_id),
-              last_enrollment_id = service_enrollment_id[which.max(end_date)],
-              all_enrollment_ids = if (dplyr::n_distinct(service_enrollment_id) > 1)
-                paste(unique(service_enrollment_id), collapse = ", ") else NA_character_,
+              # every enrollment in the merged period, in start order (one ID unless overlapping
+              # enrollments were merged). Must come before service_enrollment_id below, which
+              # replaces the column with one value.
+              enrollment_ids = paste(unique(service_enrollment_id), collapse = ", "),
               service_enrollment_id = min_or_blank(service_enrollment_id),
               # whether service started at any point in the merged period, and when it first did
               ever_active = any(service_status == "Active"),
@@ -358,7 +371,7 @@ earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, me
   df |>
     dplyr::mutate(end_date = dplyr::if_else(is.na({{dimension_end}}), {{report_end}} + lubridate::days(1), {{dimension_end}})) |>
     dplyr::arrange(participant_id, {{dimension_start}}) |>
-    dplyr::mutate(sr_code = default_sr_category(funder_service_code)) |>
+    dplyr::mutate(sr_code = default_sr_category(funder_service_code), sector = sr_sector(sr_code)) |>
     dplyr::group_by(participant_id, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::mutate(index = c(0, cumsum(as.numeric(dplyr::lead({{dimension_start}})) >
                                         cummax(as.numeric(end_date)))[-dplyr::n()])) |>
@@ -367,8 +380,8 @@ earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, me
       merged_start_date = dplyr::first({{dimension_start}}),
       merged_end_date = dplyr::last(end_date),
       merged_report_date = max_or_blank(.report_date),
-      # the enrollment whose wait started the merged period
-      first_enrollment_id = dplyr::first(service_enrollment_id),
+      # every enrollment whose wait is in the merged period, in start order
+      enrollment_ids = paste(unique(service_enrollment_id), collapse = ", "),
       all_starts = paste({{dimension_start}}, collapse = ", "),
       all_ends = paste({{dimension_end}}, collapse = ", "),
       all_funder_service_codes = paste(funder_service_code, collapse = ", "),
@@ -391,42 +404,73 @@ grain_cols <- function(grain) {
 }
 
 # Columns the overlap helpers group by. Accepts a grain ("fc", "service") or the older
-# names ("funder_service_code", "service_name"), plus "organization" (by SR code).
+# names ("funder_service_code", "service_name"), plus "organization" (by sector, so a client
+# in residential and non-residential CMH&A FCs has one organization file).
 overlap_grouping <- function(merge_level) {
   switch(merge_level,
          fc = , funder_service_code = grain_cols("fc"),
          service = , service_name = grain_cols("service"),
-         organization = "sr_code",
+         organization = "sector",
          stop("unknown merge_level: ", merge_level, call. = FALSE))
 }
 
-# Count rows per date, reporting unit and statistical account
-count_by_grain <- function(df, grain) {
+
+# Detail rows behind a statistic: one row per counted unit (an episode, a visit, a client
+# day), with the client and what it adds to the statistic. summarise_detail() turns these
+# into the summary rows, so the summary tables and the detail tables always agree.
+# - value: what the row adds to the statistic (1 for a count, or days, hours, meals or
+#   interactions)
+# - reference: the record to look up in the source system: the enrollment for episode and
+#   wait statistics, the activity for visit statistics, the group session for session counts
+detail_by_grain <- function(df, grain, value = 1L, reference = NA_character_, note = NA_character_) {
   df |>
-    dplyr::count(date, dplyr::across(dplyr::all_of(grain_cols(grain))), funder_statistical_account_code, name = "value")
+    dplyr::mutate(value = {{ value }}, reference_id = as.character({{ reference }}),
+                  reference_note = as.character({{ note }})) |>
+    dplyr::select(date, dplyr::all_of(grain_cols(grain)), funder_statistical_account_code,
+                  dplyr::any_of("participant_id"), reference_id, reference_note, value)
 }
 
-# Detail rows behind a statistic: one row per counted unit (an episode, a visit, a day),
-# with who it was and what it adds to the statistic. summarise_detail() turns these into
-# the summary rows, so the summary tables and the detail tables always agree.
-# - value: what the row adds to the statistic (1 for a count, or days, hours, attendances)
-# - source_date, source_note: why the row is counted, e.g. the episode start or the
-#   discharge reason (blank where there is nothing more to say)
-# - enrollment_id: the enrollment that triggered the count (one ID, for filtering). Where
-#   overlapping enrollments were merged, all_enrollment_ids lists them all.
-detail_by_grain <- function(df, grain, value = 1L, source_date = lubridate::NA_Date_,
-                            source_note = NA_character_, enrollment_id = NULL) {
-  df <- dplyr::mutate(df, value = {{ value }},
-                      source_date = as.Date({{ source_date }}),
-                      source_note = as.character({{ source_note }}))
-  if (!rlang::quo_is_null(rlang::enquo(enrollment_id))) {
-    df <- dplyr::mutate(df, service_enrollment_id = {{ enrollment_id }})
-  }
-  df |>
-    dplyr::select(date, dplyr::any_of("end_date"), dplyr::all_of(grain_cols(grain)), funder_statistical_account_code,
-                  dplyr::any_of(c("participant_id", "service_enrollment_id", "all_enrollment_ids",
-                                  "activity_id", "activity_group_id")),
-                  value, source_date, source_note)
+# Note for reference_note: the event and its date, e.g. "Accepted 2025-04-01" (NA when there
+# is no date)
+dated_note <- function(event, date) {
+  dplyr::if_else(is.na(date), NA_character_, paste(event, format(date, "%Y-%m-%d")))
+}
+
+# One row per `keys`, with the IDs in column `id` as one comma-separated `reference` (in order
+# of appearance, no repeats; NA if none). `id` can already hold such lists, which are merged.
+# Most keys have one ID, so only those with several are pasted together.
+collapse_ids <- function(df, keys, id) {
+  rows <- df |>
+    dplyr::distinct(dplyr::pick(dplyr::all_of(c(keys, id)))) |>
+    dplyr::mutate(reference = as.character(.data[[id]])) |>
+    dplyr::select(dplyr::all_of(keys), reference) |>
+    dplyr::mutate(.n = dplyr::n(), .by = dplyr::all_of(keys))
+
+  several <- rows |>
+    dplyr::filter(.n > 1) |>
+    dplyr::summarize(reference = merge_id_lists(reference), .by = dplyr::all_of(keys))
+
+  dplyr::bind_rows(dplyr::select(dplyr::filter(rows, .n == 1), -.n), several)
+}
+
+# One row per key, merging the references of keys with several rows (only those are pasted,
+# which keeps this fast on daily rows)
+one_row_per_key <- function(df, keys) {
+  df <- dplyr::mutate(df, .n = dplyr::n(), .by = dplyr::all_of(keys))
+  several <- df |>
+    dplyr::filter(.n > 1) |>
+    dplyr::summarize(reference = merge_id_lists(reference), .by = dplyr::all_of(keys))
+  dplyr::bind_rows(dplyr::select(dplyr::filter(df, .n == 1), dplyr::all_of(keys), reference), several)
+}
+
+# Reference for group attendance: the group session, or the activity if it has no group ID
+group_reference <- function(group_id, activity_id) {
+  dplyr::coalesce(as.character(group_id), as.character(activity_id))
+}
+
+merge_id_lists <- function(x) {
+  ids <- unique(unlist(strsplit(x[!is.na(x)], ", ", fixed = TRUE)))
+  if (length(ids) == 0) NA_character_ else paste(ids, collapse = ", ")
 }
 
 # NA as zero, keeping the type (a missing count or duration adds nothing to a sum, as
@@ -436,20 +480,25 @@ na_to_zero <- function(x) {
   x
 }
 
-# Census detail: daily rows (one per client, reporting unit, account and day) as runs of
-# consecutive days, split at month boundaries. Each run is one detail row from `date` to
-# `end_date`, with value = days in the run. Expanding the runs back into days gives the
-# daily rows again, so S403 sums by month and S406 / S455 can be read off any day.
-census_runs <- function(rows, grain) {
-  keys <- c(grain_cols(grain), "funder_statistical_account_code", "participant_id")
-  rows |>
-    dplyr::distinct(dplyr::pick(dplyr::all_of(c("date", keys)))) |>
-    dplyr::arrange(dplyr::pick(dplyr::all_of(c(keys, "date")))) |>
-    dplyr::group_by(dplyr::across(dplyr::all_of(keys)), month = lubridate::floor_date(date, "month")) |>
-    dplyr::mutate(run = cumsum(c(1L, diff(as.integer(date)) != 1L))) |>
-    dplyr::group_by(run, .add = TRUE) |>
-    dplyr::summarize(end_date = max(date), value = dplyr::n(), date = min(date), .groups = "drop") |>
-    dplyr::select(-month, -run)
+# Add the aggregation type of each row's statistic (see statistic_aggregation), after the
+# account, so a report can total any statistic without a list of statistic codes
+add_aggregation <- function(df) {
+  df |>
+    dplyr::mutate(statistic = stringr::str_sub(funder_statistical_account_code, 1, 3)) |>
+    dplyr::left_join(statistic_aggregation, by = "statistic") |>
+    dplyr::select(-statistic) |>
+    dplyr::relocate(aggregation, .after = funder_statistical_account_code)
+}
+
+# Add the key to the funder codes table, as the last column: funder_key (FC and account) by
+# FC, funder_service_key (FC, service and account) by service
+add_funder_key <- function(df, grain) {
+  if (grain == "fc") {
+    dplyr::mutate(df, funder_key = paste0(funder_service_code, "_", funder_statistical_account_code))
+  } else {
+    dplyr::mutate(df, funder_service_key = paste0(funder_service_code, "_", service_name, "_",
+                                                  funder_statistical_account_code))
+  }
 }
 
 # Summary rows (date, reporting unit, account, value) from detail rows
@@ -457,15 +506,6 @@ summarise_detail <- function(detail, grain) {
   detail |>
     dplyr::group_by(date, dplyr::across(dplyr::all_of(grain_cols(grain))), funder_statistical_account_code) |>
     dplyr::summarize(value = sum(value), .groups = "drop")
-}
-
-# Add the statistic (first three digits) and its aggregation type to detail rows, for
-# filtering and totals in the Power BI detail page
-label_detail <- function(detail) {
-  detail |>
-    dplyr::mutate(statistic = stringr::str_sub(funder_statistical_account_code, 1, 3)) |>
-    dplyr::left_join(statistic_aggregation, by = "statistic") |>
-    dplyr::relocate(statistic, aggregation, .after = funder_statistical_account_code)
 }
 
 # Fiscal year (April to March) as the 4-digit year it ends in (2025-04-01 is in "2026")
@@ -516,6 +556,9 @@ first_date <- function(dates) {
 # Rules (decided with the user, 2026-11-04):
 # - An Inactive status ends an episode. Any later status in the same enrollment starts a new
 #   one (the file was reopened), with its own referral, first service, wait and discharge.
+# - A Hold straight after an Inactive doesn't reopen the file: a discharged service can't be
+#   paused. These holds are dropped before episodes are numbered, so the client stays
+#   discharged until the file reopens on Waitlist or Active: see drop_holds_after_discharge().
 # - Once service has started in an episode, a return to On Waitlist also ends it: the client
 #   is discharged from the service (S513) and the waitlist starts a new episode with a new
 #   referral (S489), wait and first service (OHRS Ch. 10, 10.9.4.4 example 2). The client
@@ -595,8 +638,58 @@ drop_same_day_corrections <- function(services) {
   dplyr::anti_join(services, corrected, by = c("service_enrollment_id", "service_status", "service_status_start_date"))
 }
 
+# Drop On Hold statuses that come straight after an Inactive in the same enrollment (or after
+# another such hold): a discharged service can't be paused, so the client stays discharged
+# until the file reopens on Waitlist or Active (see number_episodes()). Logs how many were
+# dropped. Run it before end dates are recalculated, so the Inactive runs until the next
+# status that is kept.
+drop_holds_after_discharge <- function(services) {
+  services <- services |>
+    dplyr::arrange(service_enrollment_id, service_status_start_date, service_status)
+
+  status <- as.character(services$service_status)
+  is_hold <- status == "On Hold"
+  # position of the latest status that isn't a hold, up to each row, within the enrollment
+  first_row <- !duplicated(services$service_enrollment_id)
+  latest_non_hold <- stats::ave(ifelse(is_hold, 0L, seq_along(status)),
+                                cumsum(first_row), FUN = cummax)
+  after_discharge <- is_hold & latest_non_hold > 0 &
+    status[pmax(latest_non_hold, 1L)] == "Inactive"
+
+  if (any(after_discharge)) {
+    rlog::log_info(glue::glue("Dropped {sum(after_discharge)} On Hold status(es) that came straight ",
+                              "after a discharge (Inactive) in ",
+                              "{dplyr::n_distinct(services$service_enrollment_id[after_discharge])} ",
+                              "enrollment(s); those clients stay discharged until the file reopens ",
+                              "on Waitlist or Active"))
+  }
+
+  services[!after_discharge, ]
+}
+
 # A warning about the input data, with its own class (generateMIS_data_warning) so callers
 # can pick these out from other warnings.
+# A CSS discharge reason (the last two digits of S513 80 ** or S511 80 **) that the code table
+# doesn't list for the FC is reported as reason 90, with a data warning naming the codes, so
+# no account is reported that OHRS doesn't have. 83 9 90 is checked as 82 9 90, as in
+# check_accounts().
+fix_unknown_reasons <- function(df, statistic, warn = TRUE) {
+  valid <- with(generateMIS::all_functional_centres_and_statistical_codes,
+                paste(funder_service_code, funder_statistical_account_code))
+  check_fc <- dplyr::if_else(df$funder_service_code == "83 9 90", "82 9 90", df$funder_service_code)
+  unknown <- startsWith(df$funder_statistical_account_code, paste(statistic, "80 ")) &
+    !paste(check_fc, df$funder_statistical_account_code) %in% valid
+
+  if (warn && any(unknown)) {
+    found <- table(paste0(df$funder_statistical_account_code[unknown], " in ", df$funder_service_code[unknown]))
+    data_warning(glue::glue("{sum(unknown)} discharge(s) had a reason code that isn't an OHRS account for the FC ",
+                            "({paste0(names(found), ' (', found, ')', collapse = '; ')}); reported as ",
+                            "{statistic} 80 90. Check the discharge reasons in the source data."))
+  }
+  df$funder_statistical_account_code[unknown] <- paste(statistic, "80 90")
+  df
+}
+
 data_warning <- function(message) {
   warning(structure(class = c("generateMIS_data_warning", "warning", "condition"),
                     list(message = message, call = NULL)))

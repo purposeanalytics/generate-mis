@@ -6,10 +6,12 @@ mh_fc   <- "72 5 09 76"  # Case Management - Mental Health (fund type 2)
 mh3_fc  <- "73 5 09 76"  # Case Management - Mental Health (fund type 3)
 ps_fc   <- "72 5 82 33"  # CSS Personal Support/Independence Training
 cm_fc   <- "72 5 82 09"  # CSS Case Management
-act_fc  <- "72 5 10 76 20"  # MH Assertive Community Treatment Teams (episode rules, R1-R6)
+act_fc  <- "72 5 10 76 20"  # MH Assertive Community Treatment Teams (episode rules, R1-R8)
 day_fc  <- "72 5 20 76 10"  # Day/Night Care - Mental Health (attendance days, S483)
 tr3_fc  <- "73 5 82 14"     # CSS Transportation - Client (fund type 3)
 al_fc   <- "72 5 82 45"     # CSS Assisted Living (residential: S410/S411 instead of S513)
+wm_fc   <- "72 5 40 78 45"  # CMH&A Residential Addictions - Withdrawal Management (SR 45)
+ac_fc   <- "72 5 09 78 10"  # CMH&A Case Management - Addictions (SR 25)
 
 service_names <- c("72 5 09 76" = "MH Case Management",
                    "73 5 09 76" = "MH Case Management FT3",
@@ -18,7 +20,9 @@ service_names <- c("72 5 09 76" = "MH Case Management",
                    "72 5 10 76 20" = "ACT Team",
                    "72 5 20 76 10" = "MH Day Program",
                    "73 5 82 14" = "Transportation FT3",
-                   "72 5 82 45" = "Assisted Living")
+                   "72 5 82 45" = "Assisted Living",
+                   "72 5 40 78 45" = "Withdrawal Management",
+                   "72 5 09 78 10" = "Addictions Case Management")
 
 # One service status row
 status <- function(participant_id, enrollment, fc, service_status, start,
@@ -114,7 +118,7 @@ fixture_services <- function() {
     #   Language and special needs are on both the participant record and the activity.
     status("P11", "E12", ps_fc, "Active", "2025-08-01", decision = "2025-08-01"),
 
-    # R1-R6: episode rules (test-episode-rules.R), in their own FC with no visits.
+    # R1-R8: episode rules (test-episode-rules.R), in their own FC with no visits.
     # R1: service paused, then resumed: one episode
     status("R1", "E13", act_fc, "Active",  "2025-04-07", decision = "2025-04-07"),
     status("R1", "E13", act_fc, "On Hold", "2025-05-05", decision = "2025-04-07"),
@@ -145,6 +149,16 @@ fixture_services <- function() {
     # R6: put on the waitlist and started the same day: the Active is kept
     status("R6", "E18", act_fc, "On Waitlist", "2025-04-08", decision = "2025-04-08", end = "2025-04-08"),
     status("R6", "E18", act_fc, "Active",      "2025-04-08", decision = "2025-04-08"),
+    # R7: put on hold after being discharged: the hold doesn't reopen the file, so one
+    #   referral and one discharge
+    status("R7", "E24", act_fc, "Active",   "2025-04-10", decision = "2025-04-10"),
+    status("R7", "E24", act_fc, "Inactive", "2025-05-05", decision = "2025-04-10", reason = "10 - Goals met"),
+    status("R7", "E24", act_fc, "On Hold",  "2025-05-30", decision = "2025-04-10"),
+    # R8: on hold after being discharged, then Active again: the file reopens on the Active
+    status("R8", "E25", act_fc, "Active",   "2025-04-15", decision = "2025-04-15"),
+    status("R8", "E25", act_fc, "Inactive", "2025-05-06", decision = "2025-04-15", reason = "10 - Goals met"),
+    status("R8", "E25", act_fc, "On Hold",  "2025-05-27", decision = "2025-04-15"),
+    status("R8", "E25", act_fc, "Active",   "2025-06-24", decision = "2025-04-15"),
 
     # P12: MH day program (see fixture_activities())
     status("P12", "E19", day_fc, "Active", "2025-04-15", decision = "2025-04-15"),
@@ -161,7 +175,15 @@ fixture_services <- function() {
     #   they go on hold (May 1) is a resident day under hold_day_version = "verB" only.
     status("P16", "E23", al_fc, "Active",  "2025-04-01", decision = "2025-04-01"),
     status("P16", "E23", al_fc, "On Hold", "2025-05-01", decision = "2025-04-01"),
-    status("P16", "E23", al_fc, "Active",  "2025-05-11", decision = "2025-04-01")
+    status("P16", "E23", al_fc, "Active",  "2025-05-11", decision = "2025-04-01"),
+
+    # P17: addictions case management, with an overlapping withdrawal management stay (Jun 1-20), so
+    #   one organization file. Residential takes priority: counted once at the organization
+    #   level, as SR 45 (S501, S511, S855).
+    status("P17", "E26", ac_fc, "Active",   "2025-04-01", decision = "2025-04-01"),
+    status("P17", "E26", ac_fc, "Inactive", "2025-08-01", decision = "2025-04-01", reason = "10 - Goals met"),
+    status("P17", "E27", wm_fc, "Active",   "2025-06-01", decision = "2025-06-01"),
+    status("P17", "E27", wm_fc, "Inactive", "2025-06-20", decision = "2025-06-01", reason = "10 - Goals met")
   )
 }
 
@@ -210,14 +232,17 @@ fixture_activities <- function() {
     activity("P12", "E19", day_fc, "2025-06-10", "Assessment", 60),
 
     # P13: a 3-minute trip. Transportation has no 5-minute rule, in either fund type.
-    activity("P13", "E20", tr3_fc, "2025-06-04", "Face-to-face", 3)
+    activity("P13", "E20", tr3_fc, "2025-06-04", "Face-to-face", 3),
+
+    # P17: a case management visit before the withdrawal management stay
+    activity("P17", "E26", ac_fc, "2025-04-15", "Face-to-face", 30)
   ) |>
     dplyr::mutate(activity_id = paste0("A", dplyr::row_number()))
 }
 
 fixture_participants <- function() {
   tibble::tibble(
-    participant_id = c(paste0("P", 1:16), paste0("R", 1:6)),
+    participant_id = c(paste0("P", 1:17), paste0("R", 1:6)),
     participant_date_of_birth = as.Date("1980-01-01")
   ) |>
     dplyr::mutate(participant_ohrs_special_needs = dplyr::if_else(participant_id == "P11", "Physical Disability", NA_character_),
@@ -282,3 +307,6 @@ people <- function(tbl, fc, account) {
   rows <- tbl[tbl$funder_service_code == fc & tbl$funder_statistical_account_code == account, ]
   sort(unique(rows$participant_id))
 }
+
+# fc_506_version to run with a given fc_455_version: verB is required with verB
+matching_506 <- function(fc_455_version) if (fc_455_version == "verB") "verB" else "verA"

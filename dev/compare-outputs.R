@@ -3,9 +3,9 @@
 # Builds a reproducible random dataset (made-up people, no client data) covering 11 FCs with
 # two services each, including residential, CSS residential, meals, transportation, adult
 # day, I&R, unregistered contacts, group sessions and assessments. Runs generate_tables()
-# for all 24 combinations of fc_450_version, fc_455_version, fc_506_version and ir_version,
-# then saves the four output tables and the two detail tables from each run, or compares
-# them with a saved copy.
+# for every allowed combination of fc_450_version, fc_455_version, fc_506_version and ir_version,
+# then saves the four output tables (two detail, two visit and service summaries) from each
+# run, or compares them with a saved copy.
 #
 # Run from the repo root (takes a few minutes):
 #   Rscript dev/compare-outputs.R save      # before the change: save a baseline
@@ -148,7 +148,9 @@ readr::write_rds(activities, file.path(data_folder, "interim/rds/activities.rds"
 readr::write_rds(fc_mapping, file.path(data_folder, "interim/rds/functional_centre_mapping.rds"))
 
 combos <- tidyr::expand_grid(fc_450_version = c("verA", "verB"), fc_455_version = c("verA", "verB", "verC"),
-                             fc_506_version = c("verA", "verB"), ir_version = c("verCMHA", "verCSS"))
+                             fc_506_version = c("verA", "verB"), ir_version = c("verCMHA", "verCSS")) |>
+  # fc_455_version verB requires fc_506_version verB (generate_tables() stops otherwise)
+  dplyr::filter(!(fc_455_version == "verB" & fc_506_version == "verA"))
 canon <- function(df) {
   df <- dplyr::ungroup(df) |> as.data.frame()
   df <- df[, sort(names(df)), drop = FALSE]
@@ -174,7 +176,11 @@ if (mode == "save") {
 } else {
   before <- readRDS(out_path)
   bad <- 0
-  for (key in names(before)) for (tb in names(before[[key]]$tables)) {
+  # a baseline saved before the version rule may have runs that are no longer allowed
+  skipped <- setdiff(names(before), names(results))
+  if (length(skipped)) cat("not compared (combination no longer allowed):", skipped, "
+")
+  for (key in intersect(names(before), names(results))) for (tb in names(before[[key]]$tables)) {
     a <- before[[key]]$tables[[tb]]; b <- results[[key]]$tables[[tb]]
     eq <- isTRUE(all.equal(a, b, check.attributes = FALSE))
     colorder <- identical(before[[key]]$colnames[[tb]], results[[key]]$colnames[[tb]])

@@ -10,15 +10,15 @@ test_that("every statistic in the output has one aggregation type", {
                     c("sum_visits_and_services", "sum_census", "end_of_period", "distinct_cumulative")))
 })
 
-test_that("the aggregation type matches the file each statistic is written to", {
+test_that("the visit and service summaries hold only sum_visits_and_services statistics", {
   out <- run_mis()
-  census <- unique(substr(c(out$mis_census_counts_by_fc$funder_statistical_account_code,
-                            out$mis_census_counts_by_service$funder_statistical_account_code), 1, 3))
-  visits <- unique(substr(c(out$mis_visit_and_service_counts_by_fc$funder_statistical_account_code,
-                            out$mis_visit_and_service_counts_by_service$funder_statistical_account_code), 1, 3))
+  stats <- function(tbl) unique(substr(tbl$funder_statistical_account_code, 1, 3))
   type <- function(stats) statistic_aggregation$aggregation[match(stats, statistic_aggregation$statistic)]
-  expect_true(all(type(census) %in% c("sum_census", "end_of_period", "distinct_cumulative")))
+  visits <- c(stats(out$mis_visit_and_service_counts_by_fc), stats(out$mis_visit_and_service_counts_by_service))
   expect_true(all(type(visits) == "sum_visits_and_services"))
+  # the detail tables hold the rest: the census statistics
+  census <- setdiff(c(stats(out$mis_detail_by_fc), stats(out$mis_detail_by_service)), visits)
+  expect_true(all(type(census) %in% c("sum_census", "end_of_period", "distinct_cumulative")))
 })
 
 test_that("service_list.csv carries the aggregation type", {

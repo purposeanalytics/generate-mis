@@ -4,6 +4,18 @@
 #' @param report_date The date the run is "as at". Open statuses run to the day after this
 #'   date and only discharges on or before it are counted. Defaults to today; pass an
 #'   earlier date to reproduce a past run.
+#' @param fc_455_version What counts as being served (S455, S855, S950, S955):
+#'   - `"verA"` (default): an Active enrollment and a visit that day
+#'   - `"verB"`: a visit, whatever the enrollment status
+#'   - `"verC"`: an Active enrollment, with or without a visit
+#'   In residential FCs every Active (resident) day counts as served, under every version.
+#' @param fc_506_version How first service (S506) is dated:
+#'   - `"verA"` (default): the day the enrollment first became Active in each episode
+#'   - `"verB"`: the first completed direct activity while Active
+#'   Everyone counted in S506 should also be counted in S455, so `fc_455_version = "verB"`
+#'   (served needs a visit) requires `fc_506_version = "verB"`; otherwise a client who is
+#'   Active with no visits would receive a first service without being served. Either
+#'   version is accepted with `fc_455_version = "verA"`.
 #' @param hold_day_version How the day a client goes on hold is counted in the daily census
 #'   (S403 resident days, and other daily statistics):
 #'   - `"verA"` (default): an Active status ends the day before the next status starts,
@@ -12,15 +24,13 @@
 #'     the day the client goes on hold is still counted as Active (a hold is a temporary
 #'     absence, not a separation).
 #' @param debug
-#' @param detail If TRUE, also write the detail tables (`mis_detail_by_fc.csv` and
-#'   `mis_detail_by_service.csv`) to `data/processed`. They name the clients behind each
-#'   statistic, so they are off by default; share them only with people who check the data.
 #'
-#' @return Invisibly, a list of the four tables written to `data/processed`, plus
-#'   `mis_detail_by_fc` and `mis_detail_by_service`: the rows behind every statistic. Visit
-#'   and service statistics have one row per counted unit (episode, visit or session);
-#'   census statistics have one row per run of consecutive days for a client, within a
-#'   month (`date` to `end_date`). These are written to files only when `detail = TRUE`.
+#' @return Invisibly, a list of the four tables written to `data/processed`:
+#'   - `mis_detail_by_fc` and `mis_detail_by_service`: one row per counted unit for every
+#'     statistic (a client day for census statistics; an episode, visit or session for the
+#'     others), with the client. They name clients, so restrict who can see them.
+#'   - `mis_visit_and_service_counts_by_fc` and `mis_visit_and_service_counts_by_service`:
+#'     the visit and service statistics summed by date, reporting unit and account.
 #' @export
 #'
 #' @examples
@@ -31,10 +41,15 @@ generate_tables <- function(data_folder = here::here("data"),
                             ir_version = "verCMHA",
                             report_date = lubridate::today(),
                             hold_day_version = "verA",
-                            debug = FALSE,
-                            detail = FALSE) {
+                            debug = FALSE) {
 
   report_date <- as.Date(report_date)
+
+  if (fc_455_version == "verB" && fc_506_version != "verB") {
+    stop("fc_455_version = \"verB\" (served needs a visit) requires fc_506_version = \"verB\", ",
+         "so that everyone counted in S506 (first service) is also counted in S455 (served).",
+         call. = FALSE)
+  }
 
   if(debug == TRUE) {
     rlog::log_warn("Running in debug mode")
@@ -46,26 +61,20 @@ generate_tables <- function(data_folder = here::here("data"),
   census_counts <- generate_census_counts(processed_data, fc_455_version, fc_450_version)
   visit_and_service_counts <- generate_visit_and_service_counts(processed_data, fc_450_version, fc_506_version, ir_version)
 
-  # one detail table per grain, census and visit statistics together
-  combine_detail <- function(grain) {
-    name <- paste0("detail_by_", grain)
-    label_detail(dplyr::bind_rows(census_counts[[name]], visit_and_service_counts[[name]]))
+  # One detail table per grain: the census rows, then the visit and service rows
+  details <- list(
+    mis_detail_by_fc = dplyr::bind_rows(census_counts$fc, visit_and_service_counts$detail_by_fc),
+    mis_detail_by_service = dplyr::bind_rows(census_counts$service, visit_and_service_counts$detail_by_service)
+  )
+  for (name in names(details)) {
+    rlog::log_info(glue::glue("Writing {name}.csv (contains client IDs)"))
+    readr::write_csv(details[[name]], file.path(data_folder, "processed", paste0(name, ".csv")), na = "")
   }
-  summaries <- c(census_counts, visit_and_service_counts)
-  summaries <- summaries[!startsWith(names(summaries), "detail_by_")]
-
-  details <- list(mis_detail_by_fc = combine_detail("fc"), mis_detail_by_service = combine_detail("service"))
-
-  if (isTRUE(detail)) {
-    for (name in names(details)) {
-      rlog::log_info(glue::glue("Writing {name}.csv (contains client IDs)"))
-      readr::write_csv(details[[name]], file.path(data_folder, "processed", paste0(name, ".csv")), na = "")
-    }
-  }
+  summaries <- visit_and_service_counts[c("mis_visit_and_service_counts_by_fc", "mis_visit_and_service_counts_by_service")]
 
   rlog::log_info("MIS table generation complete!")
 
   tictoc::toc()
 
-  invisible(c(summaries, details))
+  invisible(c(details, summaries))
 }
