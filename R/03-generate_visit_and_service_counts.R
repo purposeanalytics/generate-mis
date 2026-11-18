@@ -665,7 +665,7 @@ generate_visit_and_service_counts <- function(processed_data,
     dplyr::rename(date = merged_start_date) |>
 
     # age group at the latest admission in the fiscal year
-    min_age_group_by_fiscal_year(by = "sr_code") |>
+    min_age_group_by_fiscal_year(by = "sector") |>
 
     # add organizational functional centre
     dplyr::mutate(funder_service_code = "82 9 90") |>

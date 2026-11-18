@@ -224,13 +224,21 @@ generate_census_counts <- function(processed_data,
     dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id, reference)
 
   # CMH&A: one count per fund type, in the organizational AC for that fund type (AC 82 9 90, 83 9 90)
-  calc_org_855_cmha <- served_days(c("fund_type", "participant_funder_age_group_code"),
-                                   keep = function(df) dplyr::filter(df, default_sr_category(funder_service_code) != "80"),
+  # SR category: residential (45) for the whole fiscal year if the client was served in a
+  # residential FC that year, otherwise 25, so each client is counted once (organization_sr_code())
+  calc_org_855_cmha <- served_days(c("fund_type", "participant_funder_age_group_code", "sr_code"),
+                                   keep = function(df) df |>
+                                     dplyr::mutate(sr_code = default_sr_category(funder_service_code)) |>
+                                     dplyr::filter(sr_code != "80"),
                                    match_on = "fund_type") |>
     min_age_group_by_fiscal_year(by = "fund_type") |>
+    dplyr::mutate(fiscal_year = fiscal_year(date)) |>
+    dplyr::mutate(sr_code = organization_sr_code(sr_code), .by = c(participant_id, fund_type, fiscal_year)) |>
+    # one row per client per day again, with the references of the rows merged
+    one_row_per_key(c("date", "participant_id", "fund_type", "participant_funder_age_group_code", "sr_code")) |>
     dplyr::mutate(funder_service_code = paste0("8", fund_type, " 9 90")) |>
     add_statistical_account(statistic = "855",
-                            sr_category = "25",
+                            sr_category = sr_code,
                             detail = paste0("5", age_digit(participant_funder_age_group_code))) |>
     dplyr::select(date, funder_service_code, funder_statistical_account_code, participant_id, reference)
 

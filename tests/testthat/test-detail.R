@@ -172,7 +172,7 @@ test_that("census rows reference the enrollment, or the visit that made the clie
     served <- ids(detail$reference_id[is_served])
     expect_gt(length(served), 0)
     expect_true(all(served %in% c(activity_ids, enrollment_ids)), info = version)
-    outside_residential <- is_served & !detail$funder_service_code %in% c(al_fc, "82 9 90", "83 9 90")
+    outside_residential <- is_served & !detail$funder_service_code %in% c(al_fc, wm_fc, "82 9 90", "83 9 90")
     expect_true(all(ids(detail$reference_id[outside_residential]) %in% if (version == "verC") enrollment_ids else activity_ids),
                 info = version)
   }

@@ -154,6 +154,19 @@ default_sr_category <- function(funder_service_code) {
     .default = "80")
 }
 
+# Sector of an SR code: CSS (80) or CMH&A (25, 45). Organization statistics (S501, S511,
+# S855) are counted once per client per sector.
+sr_sector <- function(sr_code) {
+  dplyr::if_else(sr_code == "80", "CSS", "CMH&A")
+}
+
+# One SR code for a client's organization-level count: residential (45) takes priority, so a
+# client who was a resident is counted once, as a resident. OHRS asks for one count per client
+# (Ch. 7, S855 ** 5*; S501 ** *0) but doesn't say which SR category wins; this is our rule.
+organization_sr_code <- function(sr_code) {
+  if ("45" %in% sr_code) "45" else min_or_blank(sr_code)
+}
+
 
 #' Determine functional centres that report in each statistical code
 #'
@@ -295,7 +308,7 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
   df |>
     dplyr::mutate(end_date = dplyr::if_else(is.na({{dimension_end}}), {{report_end}} + lubridate::days(1), {{dimension_end}})) |>
     dplyr::arrange(participant_id, {{dimension_start}}) |>
-    dplyr::mutate(sr_code = default_sr_category(funder_service_code)) |>
+    dplyr::mutate(sr_code = default_sr_category(funder_service_code), sector = sr_sector(sr_code)) |>
     dplyr::group_by(participant_id, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::mutate(.break = {{breaks}},
                   .next_start = as.numeric(dplyr::lead({{dimension_start}})),
@@ -304,6 +317,9 @@ merge_overlaps <- function(df, dimension_start, dimension_end, report_end, merge
                                         (dplyr::lead(.break) & .next_start >= .latest_end))[-dplyr::n()])) |>
     dplyr::group_by(participant_id, participant_funder_age_group_code, index, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::summarize(merged_start_date = dplyr::first({{dimension_start}}),
+              # one SR code per merged period: residential (45) if any enrollment in it was
+              # residential (only differs at the organization level, which merges across FCs)
+              sr_code = organization_sr_code(sr_code),
               # latest end in the merged period (the last-starting row may end earlier)
               merged_end_date = max_or_blank(end_date),
               all_starts = paste({{dimension_start}}, collapse = ", "),
@@ -355,7 +371,7 @@ earliest_overlaps <- function(df, dimension_start, dimension_end, report_end, me
   df |>
     dplyr::mutate(end_date = dplyr::if_else(is.na({{dimension_end}}), {{report_end}} + lubridate::days(1), {{dimension_end}})) |>
     dplyr::arrange(participant_id, {{dimension_start}}) |>
-    dplyr::mutate(sr_code = default_sr_category(funder_service_code)) |>
+    dplyr::mutate(sr_code = default_sr_category(funder_service_code), sector = sr_sector(sr_code)) |>
     dplyr::group_by(participant_id, dplyr::pick(dplyr::all_of(grouping_variables))) |>
     dplyr::mutate(index = c(0, cumsum(as.numeric(dplyr::lead({{dimension_start}})) >
                                         cummax(as.numeric(end_date)))[-dplyr::n()])) |>
@@ -388,12 +404,13 @@ grain_cols <- function(grain) {
 }
 
 # Columns the overlap helpers group by. Accepts a grain ("fc", "service") or the older
-# names ("funder_service_code", "service_name"), plus "organization" (by SR code).
+# names ("funder_service_code", "service_name"), plus "organization" (by sector, so a client
+# in residential and non-residential CMH&A FCs has one organization file).
 overlap_grouping <- function(merge_level) {
   switch(merge_level,
          fc = , funder_service_code = grain_cols("fc"),
          service = , service_name = grain_cols("service"),
-         organization = "sr_code",
+         organization = "sector",
          stop("unknown merge_level: ", merge_level, call. = FALSE))
 }
 
@@ -434,6 +451,16 @@ collapse_ids <- function(df, keys, id) {
     dplyr::summarize(reference = merge_id_lists(reference), .by = dplyr::all_of(keys))
 
   dplyr::bind_rows(dplyr::select(dplyr::filter(rows, .n == 1), -.n), several)
+}
+
+# One row per key, merging the references of keys with several rows (only those are pasted,
+# which keeps this fast on daily rows)
+one_row_per_key <- function(df, keys) {
+  df <- dplyr::mutate(df, .n = dplyr::n(), .by = dplyr::all_of(keys))
+  several <- df |>
+    dplyr::filter(.n > 1) |>
+    dplyr::summarize(reference = merge_id_lists(reference), .by = dplyr::all_of(keys))
+  dplyr::bind_rows(dplyr::select(dplyr::filter(df, .n == 1), dplyr::all_of(keys), reference), several)
 }
 
 # Reference for group attendance: the group session, or the activity if it has no group ID

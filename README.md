@@ -60,6 +60,8 @@ This can take one of three conditions for counting individuals under the "Indivi
 
 Under every version, residential functional centres (those that report S403 resident days) count each resident day as service, whether or not a visit was recorded, so anyone with resident days is an individual served in that functional centre (OHRS Ch. 10, Assisted Living and Day Services; Ch. 7, intake example).
 
+At the organization level (accounting centre 82 9 90 / 83 9 90), each CMH&A client is counted once, so a client in both residential and non-residential functional centres is reported under a single service recipient category. Residential takes priority: S501 and S511 use SR 45 if any enrollment in the organization file was residential, and S855 uses SR 45 for the whole fiscal year if the client was served in a residential functional centre that year. OHRS asks for one count per client (Ch. 7, 7.7.4 and S855 ** 5\*) but doesn't say which category wins, so this is our rule; confirm it with the OHRS help desk if in doubt.
+
 **fc_506_version**
 
 This can take one of two conditions for counting when the first service was received (506 \*\* \*\*):

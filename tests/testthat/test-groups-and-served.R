@@ -50,3 +50,21 @@ test_that("residents are served in a residential FC without a recorded visit, un
                  info = version)
   }
 })
+
+test_that("a CMH&A client who was also a resident is counted once at the organization level, as SR 45", {
+  for (version in c("verA", "verB", "verC")) {
+    out <- run_mis(fc_455_version = version, fc_506_version = matching_506(version))
+    org <- out$mis_detail_by_fc
+    org <- org[org$funder_service_code == "82 9 90" & org$participant_id == "P17", ]
+
+    # one organization file (the stays overlap), one admission and one file closure
+    expect_equal(sort(unique(org$funder_statistical_account_code)),
+                 c("501 45 40", "511 45 90", "855 45 54"), info = version)
+    expect_equal(sum(org$funder_statistical_account_code == "501 45 40"), 1, info = version)
+    expect_equal(org$reference_id[org$funder_statistical_account_code == "501 45 40"], "E26, E27", info = version)
+    # every served day, including case management before the stay, is SR 45 (verC counts
+    # from the enrollment on Apr 1, the others from the visit on Apr 15)
+    first_served <- if (version == "verC") "2025-04-01" else "2025-04-15"
+    expect_equal(min(org$date[org$funder_statistical_account_code == "855 45 54"]), as.Date(first_served), info = version)
+  }
+})
